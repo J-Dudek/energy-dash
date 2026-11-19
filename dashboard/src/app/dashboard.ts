@@ -7,6 +7,7 @@ import { AppwriteService } from './appwrite.service';
 import { EnergyChart } from './energy-chart';
 import { DashboardStore } from './dashboard-store';
 import { errorMessage } from './errors';
+import { BrandLink } from './brand-link';
 import { InstallService } from './install';
 import { defaultPasskeyName, isPasskeyCancelled } from './passkey';
 import type { Energy, InvoiceRow } from './models';
@@ -15,7 +16,7 @@ import { invoiceFilename, kpi, series } from './stats';
 
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink, DatePipe, DecimalPipe, EnergyChart],
+  imports: [RouterLink, DatePipe, DecimalPipe, EnergyChart, BrandLink],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
 })
@@ -26,6 +27,7 @@ export class Dashboard implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly params = toSignal(this.route.queryParamMap, { requireSync: true });
   private handledLink = '';
+  private refetchedForLink = false;
 
   protected readonly energies: Energy[] = ['electricity', 'gas', 'water'];
   protected readonly ENERGY_LABEL = ENERGY_LABEL;
@@ -45,6 +47,11 @@ export class Dashboard implements OnInit {
   protected readonly selected = this.store.selected;
   protected readonly showTable = this.store.showTable;
   protected readonly invoiceProvider = this.store.invoiceProvider;
+
+  /** Premier chargement : rien à montrer encore, on affiche des silhouettes plutôt qu'une page vide. */
+  protected readonly skeleton = computed(
+    () => this.loading() && this.readings().length === 0 && this.invoices().length === 0,
+  );
 
   protected readonly kpis = computed(() =>
     this.energies.map((e) => kpi(this.readings(), this.invoices(), this.tariffs(), e)),
@@ -86,6 +93,14 @@ export class Dashboard implements OnInit {
       if (this.invoices().length === 0 && this.readings().length === 0) return;
       const key = ['vue', 'facture', 'energie'].map((k) => p.get(k) ?? '').join('|');
       if (key === '||' || key === this.handledLink) return;
+
+      const wanted = p.get('facture');
+      if (wanted && !this.invoices().some((i) => i.$id === wanted) && !this.refetchedForLink) {
+        // Facture annoncée par une notification mais absente de ce qu'on a déjà chargé : une seule relecture
+        this.refetchedForLink = true;
+        void this.store.load(true);
+        return;
+      }
       this.handledLink = key;
 
       const energy = this.energies.find((e) => e === p.get('energie'));
@@ -115,10 +130,6 @@ export class Dashboard implements OnInit {
 
   ngOnInit(): void {
     void this.store.load();
-  }
-
-  protected async load(): Promise<void> {
-    await this.store.load(true);
   }
 
   protected async createPasskey(): Promise<void> {

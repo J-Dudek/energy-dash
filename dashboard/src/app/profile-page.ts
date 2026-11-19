@@ -6,6 +6,7 @@ import { RouterLink } from '@angular/router';
 import type { Models } from 'appwrite';
 import { AppwriteException } from 'appwrite';
 import { AppwriteService } from './appwrite.service';
+import { BrandLink } from './brand-link';
 import { defaultPasskeyName, isPasskeyCancelled, passkeysSupported } from './passkey';
 import type { PushDevice } from './models';
 import type { PushStatus } from './push';
@@ -21,7 +22,7 @@ import {
 /** Page de profil : changement d'adresse e-mail, passkeys, déconnexion. */
 @Component({
   selector: 'app-profile-page',
-  imports: [FormsModule, DatePipe, RouterLink],
+  imports: [FormsModule, DatePipe, RouterLink, BrandLink],
   templateUrl: './profile-page.html',
   styleUrl: './profile-page.scss',
 })

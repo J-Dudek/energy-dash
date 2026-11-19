@@ -6,6 +6,7 @@ import { AppwriteService } from './appwrite.service';
 import { errorMessage } from './errors';
 import { IdleWatcher } from './idle-watcher';
 import { isPasskeyCancelled, passkeysSupported } from './passkey';
+import { DashboardStore } from './dashboard-store';
 import { InstallService } from './install';
 import { UpdateService } from './update';
 import { markNotificationsSeen, onServiceWorkerNavigate, registerServiceWorker } from './push';
@@ -22,6 +23,7 @@ export class App implements OnInit, OnDestroy {
   private readonly router = inject(Router);
   private readonly install = inject(InstallService);
   protected readonly update = inject(UpdateService);
+  private readonly store = inject(DashboardStore);
   private idle?: IdleWatcher;
 
   protected readonly ready = signal(false);
@@ -73,7 +75,10 @@ export class App implements OnInit, OnDestroy {
       if (this.aw.user()) void this.router.navigateByUrl(url);
     });
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && this.aw.user()) void markNotificationsSeen();
+      if (document.visibilityState === 'visible' && this.aw.user()) {
+        void markNotificationsSeen();
+        void this.store.refreshIfStale();
+      }
     });
     try {
       await this.aw.init();

@@ -5,7 +5,10 @@
   </div>
 }
 @if (!ready()) {
-  <main class="center"><p class="muted">Chargement…</p></main>
+  <main class="center splash" role="status">
+    <img src="icons/logo.png" alt="" width="64" height="96" />
+    <p class="muted">Chargement…</p>
+  </main>
 } @else if (!aw.user()) {
   <main class="center">
     <form class="login card" (ngSubmit)="login()">
