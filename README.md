@@ -244,6 +244,12 @@ remplacent pas ces réglages (un minuteur côté navigateur n'est pas une fronti
   utilisable ; il n'y a pas encore de TOTP sur l'écran de connexion.
 - Les styles sont autorisés en ligne (`style-src 'unsafe-inline'`), car Angular en injecte ; les scripts, eux, ne le sont pas.
 
+## Déploiement sur un NAS Synology
+
+Guide pas à pas (Container Manager, reverse proxy HTTPS, durcissement DSM, sauvegardes) :
+[docs/deploiement-synology.md](docs/deploiement-synology.md). Avant un déploiement, `sh scripts/preflight.sh`
+vérifie le `.env`.
+
 ## Pistes
 
 - Suivi journalier de l'électricité (Linky) ou du gaz (Gazpar) : non vérifié, l'accès des

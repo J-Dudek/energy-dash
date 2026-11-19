@@ -58,7 +58,7 @@ jobs:
         with:
           dockerfile: dashboard/Dockerfile
       - name: ShellCheck
-        run: shellcheck dashboard/docker-entrypoint.d/*.sh .githooks/pre-commit
+        run: shellcheck dashboard/docker-entrypoint.d/*.sh .githooks/pre-commit scripts/*.sh
       - name: Construction des images (sans publication)
         run: |
           docker build -t conso-collector:ci collector
