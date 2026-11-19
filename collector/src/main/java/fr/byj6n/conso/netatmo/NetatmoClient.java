@@ -5,11 +5,6 @@ import fr.byj6n.conso.model.Invoice;
 import fr.byj6n.conso.model.Reading;
 import fr.byj6n.conso.port.ProviderClient;
 import fr.byj6n.conso.port.ProviderSession;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -24,29 +19,41 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Temps de chauffe de la chaudière, via l'API officielle Netatmo (thermostat + relais).
+ *
  * <ul>
- *   <li>POST /oauth2/token (refresh_token) → access_token (3 h) + nouveau refresh_token, à conserver</li>
- *   <li>GET  /api/homesdata → relais (NAPlug) et thermostat (NATherm1)</li>
- *   <li>GET  /api/getmeasure (scale=1day, type=sum_boiler_on) → secondes de marche par jour</li>
+ *   <li>POST /oauth2/token (refresh_token) → access_token (3 h) + nouveau refresh_token, à
+ *       conserver
+ *   <li>GET /api/homesdata → relais (NAPlug) et thermostat (NATherm1)
+ *   <li>GET /api/getmeasure (scale=1day, type=sum_boiler_on) → secondes de marche par jour
  * </ul>
- * Pas de facture : un relevé journalier "heating" en heures, à rapprocher de la consommation de gaz.
+ *
+ * Pas de facture : un relevé journalier "heating" en heures, à rapprocher de la consommation de
+ * gaz.
  */
 public class NetatmoClient implements ProviderClient {
 
     private static final Logger log = LoggerFactory.getLogger(NetatmoClient.class);
     private static final String BASE = "https://api.netatmo.com";
     private static final double SECONDS_PER_DAY = 86_400;
-    /** getmeasure renvoie au plus 1024 valeurs par appel : au pas d'un jour, on reste en dessous. */
+
+    /**
+     * getmeasure renvoie au plus 1024 valeurs par appel : au pas d'un jour, on reste en dessous.
+     */
     private static final int MAX_LOOKBACK_DAYS = 1000;
 
     private final CollectorProperties.Netatmo cfg;
     private final ObjectMapper mapper;
     private final String base;
     private final NetatmoTokenStore tokens;
-    private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20)).build();
+    private final HttpClient http =
+            HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20)).build();
 
     public NetatmoClient(CollectorProperties.Netatmo cfg, ObjectMapper mapper) {
         this(cfg, mapper, BASE);
@@ -70,7 +77,10 @@ public class NetatmoClient implements ProviderClient {
         return new Session(accessToken);
     }
 
-    /** Échange le jeton de renouvellement et enregistre aussitôt le nouveau : l'ancien est déjà périmé. */
+    /**
+     * Échange le jeton de renouvellement et enregistre aussitôt le nouveau : l'ancien est déjà
+     * périmé.
+     */
     private String refreshAccessToken() throws IOException, InterruptedException {
         String refresh = tokens.load(cfg.refreshToken());
         Map<String, String> form = new LinkedHashMap<>();
@@ -78,13 +88,21 @@ public class NetatmoClient implements ProviderClient {
         form.put("refresh_token", refresh);
         form.put("client_id", cfg.clientId());
         form.put("client_secret", cfg.clientSecret());
-        HttpResponse<String> resp = http.send(request("/oauth2/token")
-                .header("Content-Type", "application/x-www-form-urlencoded")
-                .POST(HttpRequest.BodyPublishers.ofString(encode(form))).build(), HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> resp =
+                http.send(
+                        request("/oauth2/token")
+                                .header("Content-Type", "application/x-www-form-urlencoded")
+                                .POST(HttpRequest.BodyPublishers.ofString(encode(form)))
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
         if (resp.statusCode() != 200) {
             String error = mapper.readTree(resp.body()).path("error").asText("?");
-            throw new IOException("Netatmo : renouvellement du jeton refusé (HTTP " + resp.statusCode() + ", " + error
-                    + "). Génère un nouveau jeton sur dev.netatmo.com et mets-le dans CONSO_NETATMO_REFRESH_TOKEN.");
+            throw new IOException(
+                    "Netatmo : renouvellement du jeton refusé (HTTP "
+                            + resp.statusCode()
+                            + ", "
+                            + error
+                            + "). Génère un nouveau jeton sur dev.netatmo.com et mets-le dans CONSO_NETATMO_REFRESH_TOKEN.");
         }
         JsonNode json = mapper.readTree(resp.body());
         String access = json.path("access_token").asText(null);
@@ -110,8 +128,10 @@ public class NetatmoClient implements ProviderClient {
             long end = Instant.now().getEpochSecond();
             int days = Math.min(cfg.lookbackDays(), MAX_LOOKBACK_DAYS);
             if (days < cfg.lookbackDays()) {
-                log.warn("[netatmo] historique limité à {} jours (au lieu de {}) : Netatmo plafonne à 1024 valeurs par appel",
-                        days, cfg.lookbackDays());
+                log.warn(
+                        "[netatmo] historique limité à {} jours (au lieu de {}) : Netatmo plafonne à 1024 valeurs par appel",
+                        days,
+                        cfg.lookbackDays());
             }
             long begin = end - days * 86_400L;
             Map<String, String> q = new LinkedHashMap<>();
@@ -127,10 +147,16 @@ public class NetatmoClient implements ProviderClient {
 
             double max = readings.stream().mapToDouble(Reading::quantity).max().orElse(0);
             if (max * 3600 > SECONDS_PER_DAY * 1.05) {
-                log.warn("[netatmo] {} h de chauffe sur une journée : l'unité de '{}' n'est sans doute pas la seconde",
-                        max, cfg.measureType());
+                log.warn(
+                        "[netatmo] {} h de chauffe sur une journée : l'unité de '{}' n'est sans doute pas la seconde",
+                        max,
+                        cfg.measureType());
             }
-            log.info("[netatmo] {} jours de chauffe reçus ({}), max {} h/jour", readings.size(), cfg.measureType(), max);
+            log.info(
+                    "[netatmo] {} jours de chauffe reçus ({}), max {} h/jour",
+                    readings.size(),
+                    cfg.measureType(),
+                    max);
             return readings;
         }
 
@@ -149,17 +175,34 @@ public class NetatmoClient implements ProviderClient {
                 return new NetatmoMapper.Thermostat(cfg.deviceId(), cfg.moduleId());
             }
             return NetatmoMapper.thermostat(getJson("/api/homesdata"))
-                    .orElseThrow(() -> new IOException("Netatmo : aucun thermostat NATherm1 trouvé sur le compte"));
+                    .orElseThrow(
+                            () ->
+                                    new IOException(
+                                            "Netatmo : aucun thermostat NATherm1 trouvé sur le compte"));
         }
 
         private JsonNode getJson(String path) throws IOException, InterruptedException {
-            HttpResponse<String> resp = http.send(request(path)
-                    .header("Authorization", "Bearer " + accessToken).GET().build(), HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> resp =
+                    http.send(
+                            request(path)
+                                    .header("Authorization", "Bearer " + accessToken)
+                                    .GET()
+                                    .build(),
+                            HttpResponse.BodyHandlers.ofString());
             if (resp.statusCode() != 200) {
-                throw new IOException("Netatmo : GET " + path.split("\\?")[0] + " → HTTP " + resp.statusCode());
+                throw new IOException(
+                        "Netatmo : GET " + route(path) + " → HTTP " + resp.statusCode());
             }
             return mapper.readTree(resp.body());
         }
+    }
+
+    /**
+     * Chemin sans la requête (qui contient les identifiants d'appareil) pour les messages d'erreur.
+     */
+    private static String route(String path) {
+        int query = path.indexOf('?');
+        return query < 0 ? path : path.substring(0, query);
     }
 
     private HttpRequest.Builder request(String path) {
@@ -174,8 +217,11 @@ public class NetatmoClient implements ProviderClient {
 
     private static String encode(Map<String, String> params) {
         return params.entrySet().stream()
-                .map(e -> URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8) + "="
-                        + URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
+                .map(
+                        e ->
+                                URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8)
+                                        + "="
+                                        + URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
                 .collect(Collectors.joining("&"));
     }
 }

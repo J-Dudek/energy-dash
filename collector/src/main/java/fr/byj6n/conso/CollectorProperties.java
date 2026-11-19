@@ -5,8 +5,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 
 /**
  * Configuration du collecteur. Tout vient des variables d'environnement du conteneur
- * (CONSO_GDB_EMAIL, CONSO_APPWRITE_API_KEY, ...). Les identifiants fournisseurs ne
- * sortent jamais de ce process.
+ * (CONSO_GDB_EMAIL, CONSO_APPWRITE_API_KEY, ...). Les identifiants fournisseurs ne sortent jamais
+ * de ce process.
  */
 @ConfigurationProperties(prefix = "conso")
 public record CollectorProperties(
@@ -16,15 +16,18 @@ public record CollectorProperties(
         Netatmo netatmo,
         Appwrite appwrite) {
 
-    public record Account(
-            @DefaultValue("false") boolean enabled,
-            String email,
-            String password) {
+    public record Account(@DefaultValue("false") boolean enabled, String email, String password) {
 
         /** Pas de secret ni d'adresse e-mail dans les logs ou les messages d'erreur. */
         @Override
         public String toString() {
-            return "Account[enabled=" + enabled + ", email=" + redact(email) + ", password=" + redact(password) + "]";
+            return "Account[enabled="
+                    + enabled
+                    + ", email="
+                    + redact(email)
+                    + ", password="
+                    + redact(password)
+                    + "]";
         }
     }
 
@@ -48,8 +51,17 @@ public record CollectorProperties(
 
         @Override
         public String toString() {
-            return "Netatmo[enabled=" + enabled + ", clientId=" + redact(clientId) + ", clientSecret=" + redact(clientSecret)
-                    + ", refreshToken=" + redact(refreshToken) + ", measureType=" + measureType + "]";
+            return "Netatmo[enabled="
+                    + enabled
+                    + ", clientId="
+                    + redact(clientId)
+                    + ", clientSecret="
+                    + redact(clientSecret)
+                    + ", refreshToken="
+                    + redact(refreshToken)
+                    + ", measureType="
+                    + measureType
+                    + "]";
         }
     }
 
@@ -64,12 +76,26 @@ public record CollectorProperties(
 
         @Override
         public String toString() {
-            return "Appwrite[endpoint=" + endpoint + ", projectId=" + projectId + ", apiKey=" + redact(apiKey)
-                    + ", databaseId=" + databaseId + ", bucketId=" + bucketId + ", readRole=" + readRole + "]";
+            return "Appwrite[endpoint="
+                    + endpoint
+                    + ", projectId="
+                    + projectId
+                    + ", apiKey="
+                    + redact(apiKey)
+                    + ", databaseId="
+                    + databaseId
+                    + ", bucketId="
+                    + bucketId
+                    + ", readRole="
+                    + readRole
+                    + "]";
         }
     }
 
-    /** "***" pour une valeur renseignée, "(vide)" sinon : on sait si c'est configuré sans rien révéler. */
+    /**
+     * "***" pour une valeur renseignée, "(vide)" sinon : on sait si c'est configuré sans rien
+     * révéler.
+     */
     static String redact(String secret) {
         return secret == null || secret.isBlank() ? "(vide)" : "***";
     }

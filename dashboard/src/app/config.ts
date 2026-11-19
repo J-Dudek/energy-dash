@@ -1,4 +1,4 @@
-import { AppConfig } from './models';
+import type { AppConfig } from './models';
 
 const ID = /^[A-Za-z0-9._-]{1,64}$/;
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
@@ -12,7 +12,8 @@ export const DEFAULT_MAX_SESSION_HOURS = 12;
  * identifiants en clair.
  */
 export function validateConfig(raw: unknown): AppConfig {
-  if (typeof raw !== 'object' || raw === null) throw new Error('Configuration invalide (config.json)');
+  if (typeof raw !== 'object' || raw === null)
+    throw new Error('Configuration invalide (config.json)');
   const c = raw as Record<string, unknown>;
 
   const endpoint = typeof c['endpoint'] === 'string' ? c['endpoint'] : '';
@@ -22,12 +23,15 @@ export function validateConfig(raw: unknown): AppConfig {
   } catch {
     throw new Error('Configuration invalide : endpoint Appwrite illisible');
   }
-  const secure = url.protocol === 'https:' || (url.protocol === 'http:' && LOCAL_HOSTS.has(url.hostname));
+  const secure =
+    url.protocol === 'https:' || (url.protocol === 'http:' && LOCAL_HOSTS.has(url.hostname));
   if (!secure) {
-    throw new Error('Configuration refusée : l\'endpoint Appwrite doit être en https (identifiants en clair sinon)');
+    throw new Error(
+      "Configuration refusée : l'endpoint Appwrite doit être en https (identifiants en clair sinon)",
+    );
   }
   for (const key of ['projectId', 'databaseId', 'bucketId']) {
-    if (typeof c[key] !== 'string' || !ID.test(c[key] as string)) {
+    if (typeof c[key] !== 'string' || !ID.test(c[key])) {
       throw new Error(`Configuration invalide : ${key}`);
     }
   }

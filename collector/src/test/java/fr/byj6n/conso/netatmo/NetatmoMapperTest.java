@@ -1,13 +1,12 @@
 package fr.byj6n.conso.netatmo;
 
-import fr.byj6n.conso.model.Reading;
-import org.junit.jupiter.api.Test;
-import tools.jackson.databind.ObjectMapper;
+import static org.assertj.core.api.Assertions.assertThat;
 
+import fr.byj6n.conso.model.Reading;
 import java.time.LocalDate;
 import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
 
 /** Les JSON reprennent la forme documentée par Netatmo (valeurs fictives). */
 class NetatmoMapperTest {
@@ -16,7 +15,9 @@ class NetatmoMapperTest {
 
     @Test
     void trouveLeThermostatEtSonRelais() throws Exception {
-        var json = mapper.readTree("""
+        var json =
+                mapper.readTree(
+                        """
                 {"body":{"homes":[{"modules":[
                   {"id":"70:ee:50:00:00:01","type":"NAPlug"},
                   {"id":"04:00:00:00:00:02","type":"NATherm1","bridge":"70:ee:50:00:00:01"}]}]}}
@@ -30,7 +31,9 @@ class NetatmoMapperTest {
 
     @Test
     void pasDeThermostat() throws Exception {
-        var json = mapper.readTree("""
+        var json =
+                mapper.readTree(
+                        """
                 {"body":{"homes":[{"modules":[{"id":"x","type":"NRV","bridge":"y"}]}]}}
                 """);
 
@@ -40,7 +43,9 @@ class NetatmoMapperTest {
     @Test
     void heuresDeChauffeFormatParHorodatage() throws Exception {
         // 1763420400 = 2025-11-17 23:00 UTC = 18/11/2025 00:00 à Paris
-        var json = mapper.readTree("""
+        var json =
+                mapper.readTree(
+                        """
                 {"status":"ok","body":{"1763420400":[14820],"1763506800":[9300],"1763593200":[null]}}
                 """);
 
@@ -60,20 +65,24 @@ class NetatmoMapperTest {
 
     @Test
     void heuresDeChauffeFormatParPas() throws Exception {
-        var json = mapper.readTree("""
+        var json =
+                mapper.readTree(
+                        """
                 {"status":"ok","body":[{"beg_time":1763420400,"step_time":86400,"value":[[7200],[3600],[null]]}]}
                 """);
 
         List<Reading> r = NetatmoMapper.heating(json);
 
-        assertThat(r).extracting(Reading::periodEnd)
+        assertThat(r)
+                .extracting(Reading::periodEnd)
                 .containsExactly(LocalDate.of(2025, 11, 18), LocalDate.of(2025, 11, 19));
         assertThat(r).extracting(Reading::quantity).containsExactly(2.0, 1.0);
     }
 
     @Test
     void reponseVide() throws Exception {
-        assertThat(NetatmoMapper.heating(mapper.readTree("{\"status\":\"ok\",\"body\":{}}"))).isEmpty();
+        assertThat(NetatmoMapper.heating(mapper.readTree("{\"status\":\"ok\",\"body\":{}}")))
+                .isEmpty();
         assertThat(NetatmoMapper.heating(mapper.readTree("{}"))).isEmpty();
     }
 }

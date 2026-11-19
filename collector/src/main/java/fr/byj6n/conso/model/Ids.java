@@ -5,12 +5,12 @@ final class Ids {
 
     static final int MAX = 36;
 
-    private Ids() {
-    }
+    private Ids() {}
 
     /**
-     * Les valeurs viennent des fournisseurs : on ne leur fait pas confiance pour la forme. Un identifiant
-     * trop long est raccourci avec une empreinte, pour rester déterministe (upsert) sans collision pratique.
+     * Les valeurs viennent des fournisseurs : on ne leur fait pas confiance pour la forme. Un
+     * identifiant trop long est raccourci avec une empreinte, pour rester déterministe (upsert)
+     * sans collision pratique.
      */
     static String of(String raw) {
         String id = raw.replaceAll("[^a-zA-Z0-9._-]", "").replaceAll("^[^a-zA-Z0-9]+", "");

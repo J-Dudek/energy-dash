@@ -7,6 +7,9 @@ import fr.byj6n.conso.model.Reading;
 import fr.byj6n.conso.model.Tariff;
 import fr.byj6n.conso.port.ProviderClient;
 import fr.byj6n.conso.port.ProviderSession;
+import java.io.IOException;
+import java.util.List;
+import java.util.concurrent.locks.ReentrantLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -14,13 +17,9 @@ import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
-import java.util.List;
-import java.util.concurrent.locks.ReentrantLock;
-
 /**
- * Collecte planifiée : pour chaque fournisseur, connexion puis relevés, factures (+ PDF manquants) et tarifs.
- * Un fournisseur en erreur n'empêche pas les autres de passer.
+ * Collecte planifiée : pour chaque fournisseur, connexion puis relevés, factures (+ PDF manquants)
+ * et tarifs. Un fournisseur en erreur n'empêche pas les autres de passer.
  */
 @Component
 public class CollectorJob {
@@ -34,7 +33,11 @@ public class CollectorJob {
     private final ReentrantLock lock = new ReentrantLock();
     private volatile boolean schemaReady;
 
-    public CollectorJob(Providers providers, AppwriteSchema schema, AppwriteStore store, CollectorProperties props) {
+    public CollectorJob(
+            Providers providers,
+            AppwriteSchema schema,
+            AppwriteStore store,
+            CollectorProperties props) {
         this.clients = providers.clients();
         this.schema = schema;
         this.store = store;
@@ -81,8 +84,13 @@ public class CollectorJob {
             int readings = collectReadings(session);
             InvoiceStats invoices = collectInvoices(p, session);
             int tariffs = collectTariffs(p, session);
-            log.info("[{}] {} relevés, {} factures ({} nouveaux PDF), {} tarifs",
-                    p, readings, invoices.total(), invoices.newPdf(), tariffs);
+            log.info(
+                    "[{}] {} relevés, {} factures ({} nouveaux PDF), {} tarifs",
+                    p,
+                    readings,
+                    invoices.total(),
+                    invoices.newPdf(),
+                    tariffs);
         } catch (InterruptedException e) {
             throw e;
         } catch (Exception e) {
@@ -100,7 +108,8 @@ public class CollectorJob {
     }
 
     /** Une facture dont le PDF est inaccessible est ignorée sans bloquer les suivantes. */
-    private InvoiceStats collectInvoices(String provider, ProviderSession session) throws IOException, InterruptedException {
+    private InvoiceStats collectInvoices(String provider, ProviderSession session)
+            throws IOException, InterruptedException {
         List<Invoice> invoices = session.invoices();
         int newPdf = 0;
         for (Invoice inv : invoices) {
@@ -113,8 +122,11 @@ public class CollectorJob {
         return new InvoiceStats(invoices.size(), newPdf);
     }
 
-    /** Secondaire : une erreur est journalisée mais ne fait pas échouer la collecte du fournisseur. */
-    private int collectTariffs(String provider, ProviderSession session) throws InterruptedException {
+    /**
+     * Secondaire : une erreur est journalisée mais ne fait pas échouer la collecte du fournisseur.
+     */
+    private int collectTariffs(String provider, ProviderSession session)
+            throws InterruptedException {
         try {
             List<Tariff> tariffs = session.tariffs();
             for (Tariff t : tariffs) {
@@ -127,6 +139,5 @@ public class CollectorJob {
         }
     }
 
-    private record InvoiceStats(int total, int newPdf) {
-    }
+    private record InvoiceStats(int total, int newPdf) {}
 }

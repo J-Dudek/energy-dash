@@ -1,15 +1,14 @@
 package fr.byj6n.conso.ileo;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import fr.byj6n.conso.model.Invoice;
 import fr.byj6n.conso.model.Reading;
-import org.junit.jupiter.api.Test;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
 
 class IleoParserTest {
 
@@ -21,7 +20,10 @@ class IleoParserTest {
 
     @Test
     void fusionneVolumesEtMontants() throws IOException {
-        var rows = IleoParser.parse(fixture("ileo-consommations-facturees.html"), fixture("ileo-gerer-factures.html"));
+        var rows =
+                IleoParser.parse(
+                        fixture("ileo-consommations-facturees.html"),
+                        fixture("ileo-gerer-factures.html"));
 
         assertThat(rows).hasSize(3);
         assertThat(rows.getFirst().date()).isEqualTo(LocalDate.of(2025, 11, 12)); // trié croissant
@@ -37,7 +39,10 @@ class IleoParserTest {
 
     @Test
     void relevesChainesEntreFactures() throws IOException {
-        var rows = IleoParser.parse(fixture("ileo-consommations-facturees.html"), fixture("ileo-gerer-factures.html"));
+        var rows =
+                IleoParser.parse(
+                        fixture("ileo-consommations-facturees.html"),
+                        fixture("ileo-gerer-factures.html"));
         List<Reading> readings = IleoParser.readings(rows);
 
         assertThat(readings).hasSize(3);
@@ -51,18 +56,23 @@ class IleoParserTest {
 
     @Test
     void facturesAvecReferencePdf() throws IOException {
-        var rows = IleoParser.parse(fixture("ileo-consommations-facturees.html"), fixture("ileo-gerer-factures.html"));
+        var rows =
+                IleoParser.parse(
+                        fixture("ileo-consommations-facturees.html"),
+                        fixture("ileo-gerer-factures.html"));
         List<Invoice> invoices = IleoParser.invoices(rows);
 
-        assertThat(invoices).extracting(Invoice::rowId)
+        assertThat(invoices)
+                .extracting(Invoice::rowId)
                 .containsExactly("ileo-1000000001", "ileo-1000000002", "ileo-1000000003");
         assertThat(invoices).allMatch(i -> i.sourceRef() != null && i.energy().equals("water"));
     }
 
     @Test
     void detectePageDeConnexion() {
-        String login = "<form method=post><input name=email><input type=password name=password>"
-                + "<input type=hidden name=connexion value=1></form>";
+        String login =
+                "<form method=post><input name=email><input type=password name=password>"
+                        + "<input type=hidden name=connexion value=1></form>";
         assertThat(IleoParser.isLoginPage(login)).isTrue();
         assertThat(IleoParser.isLoginPage("<table><tr><td>13/11/2026</td></tr></table>")).isFalse();
     }
@@ -76,7 +86,8 @@ class IleoParserTest {
 
     @Test
     void ligneAvecDateInvalideIgnoree() {
-        String conso = """
+        String conso =
+                """
                 <table><tr><td>31/02/2026</td><td>BAD</td><td>10 m3</td></tr>
                 <tr><td>13/11/2026</td><td>OK</td><td>64 m3</td></tr></table>""";
 

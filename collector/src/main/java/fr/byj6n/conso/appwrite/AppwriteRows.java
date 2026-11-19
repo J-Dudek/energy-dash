@@ -3,16 +3,17 @@ package fr.byj6n.conso.appwrite;
 import fr.byj6n.conso.model.Invoice;
 import fr.byj6n.conso.model.Reading;
 import fr.byj6n.conso.model.Tariff;
-
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Modèle normalisé vers colonnes des tables Appwrite (voir {@link AppwriteSchema}). Fonctions pures, testables seules. */
+/**
+ * Modèle normalisé vers colonnes des tables Appwrite (voir {@link AppwriteSchema}). Fonctions
+ * pures, testables seules.
+ */
 final class AppwriteRows {
 
-    private AppwriteRows() {
-    }
+    private AppwriteRows() {}
 
     static Map<String, Object> of(Reading r) {
         Map<String, Object> data = new LinkedHashMap<>();

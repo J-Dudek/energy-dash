@@ -1,20 +1,20 @@
 package fr.byj6n.conso.gdb;
 
-import tools.jackson.databind.JsonNode;
 import fr.byj6n.conso.model.Invoice;
 import fr.byj6n.conso.model.Reading;
 import fr.byj6n.conso.model.Tariff;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.ResolverStyle;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Convertit les réponses JSON de espaceclient.gazdebordeaux.fr en modèle normalisé.
@@ -35,15 +35,17 @@ public final class GazDeBordeauxMapper {
 
     private static final Logger log = LoggerFactory.getLogger(GazDeBordeauxMapper.class);
     static final String PROVIDER = "gdb";
-    private static final DateTimeFormatter MONTH_LABEL = DateTimeFormatter.ofPattern("MM-uuuu").withResolverStyle(ResolverStyle.STRICT);
-    private static final DateTimeFormatter FR_DATE = DateTimeFormatter.ofPattern("dd/MM/uuuu").withResolverStyle(ResolverStyle.STRICT);
+    private static final ZoneId PARIS = ZoneId.of("Europe/Paris");
+    private static final DateTimeFormatter MONTH_LABEL =
+            DateTimeFormatter.ofPattern("MM-uuuu").withResolverStyle(ResolverStyle.STRICT);
+    private static final DateTimeFormatter FR_DATE =
+            DateTimeFormatter.ofPattern("dd/MM/uuuu").withResolverStyle(ResolverStyle.STRICT);
 
-    private GazDeBordeauxMapper() {
-    }
+    private GazDeBordeauxMapper() {}
 
     /** Type de contrat ("elec", "gaz") vers le segment d'URL de l'API ("elec", "gas"). */
     static String apiSegment(String contractType) {
-        return contractType.toLowerCase().startsWith("ga") ? "gas" : "elec";
+        return contractType.toLowerCase(Locale.ROOT).startsWith("ga") ? "gas" : "elec";
     }
 
     static String energy(String contractTypeOrSegment) {
@@ -56,7 +58,9 @@ public final class GazDeBordeauxMapper {
             YearMonth month;
             try {
                 month = YearMonth.parse(item.path("label").asText(), MONTH_LABEL);
-            } catch (DateTimeException e) { // une ligne illisible ne doit pas faire perdre les autres mois
+            } catch (
+                    DateTimeException
+                            e) { // une ligne illisible ne doit pas faire perdre les autres mois
                 log.warn("[gdb] relevé ignoré : mois illisible");
                 continue;
             }
@@ -75,9 +79,22 @@ public final class GazDeBordeauxMapper {
             } else {
                 total = c.asDouble(0);
             }
-            Double temp = item.hasNonNull("averageTemperature") ? item.get("averageTemperature").asDouble() : null;
-            out.add(new Reading(PROVIDER, energy(apiSegment), "month",
-                    month.atDay(1), month.atEndOfMonth(), total, "kWh", hp, hc, temp));
+            Double temp =
+                    item.hasNonNull("averageTemperature")
+                            ? item.get("averageTemperature").asDouble()
+                            : null;
+            out.add(
+                    new Reading(
+                            PROVIDER,
+                            energy(apiSegment),
+                            "month",
+                            month.atDay(1),
+                            month.atEndOfMonth(),
+                            total,
+                            "kWh",
+                            hp,
+                            hc,
+                            temp));
         }
         return out;
     }
@@ -93,21 +110,26 @@ public final class GazDeBordeauxMapper {
                 log.warn("[gdb] facture ignorée : date illisible");
                 continue;
             }
-            out.add(new Invoice(PROVIDER,
-                    energy(inv.path("type").asText("elec")),
-                    inv.path("code").asText(),
-                    date,
-                    amount,
-                    inv.path("isPaid").asBoolean(false) ? Double.valueOf(0.0) : amount,
-                    null,
-                    // type brut ("elec"/"gaz") + id : les deux sont requis par /api/document/download
-                    inv.path("type").asText("elec") + "|" + inv.path("id").asText(),
-                    contractId));
+            out.add(
+                    new Invoice(
+                            PROVIDER,
+                            energy(inv.path("type").asText("elec")),
+                            inv.path("code").asText(),
+                            date,
+                            amount,
+                            inv.path("isPaid").asBoolean(false) ? Double.valueOf(0.0) : amount,
+                            null,
+                            // type brut ("elec"/"gaz") + id : les deux sont requis par
+                            // /api/document/download
+                            inv.path("type").asText("elec") + "|" + inv.path("id").asText(),
+                            contractId));
         }
         return out;
     }
 
-    /** Tarif TTC d'un contrat ; null si la réponse ne contient pas de grille tarifaire exploitable. */
+    /**
+     * Tarif TTC d'un contrat ; null si la réponse ne contient pas de grille tarifaire exploitable.
+     */
     public static Tariff tariff(String contractType, JsonNode contract) {
         JsonNode ts = contract.path("tarifScale");
         if (ts.isMissingNode() || ts.isNull()) return null;
@@ -116,18 +138,31 @@ public final class GazDeBordeauxMapper {
         if (energy.equals("gas")) {
             if (!ts.hasNonNull("prixTotalTTCConso")) return null;
             LocalDate from = date(ts, "dateDebutValiditePrix", "dateDebut");
-            return new Tariff(PROVIDER, energy, from, offer, ts.get("prixTotalTTCConso").asDouble(), null, null,
+            return new Tariff(
+                    PROVIDER,
+                    energy,
+                    from,
+                    offer,
+                    ts.get("prixTotalTTCConso").asDouble(),
+                    null,
+                    null,
                     num(ts, "prixTotalTTCAbo"));
         }
         JsonNode hp = ts.path("hp").path("prixConsoUniteWithTaxeTTC");
         JsonNode hc = ts.path("hc").path("prixConsoUniteWithTaxeTTC");
         JsonNode base = ts.path("base").path("prixConsoUniteWithTaxeTTC");
         if (!(hp.isNumber() && hc.isNumber()) && !base.isNumber()) return null;
-        return new Tariff(PROVIDER, energy, date(ts, "dateDebut", "dateDebut"), offer,
+        return new Tariff(
+                PROVIDER,
+                energy,
+                date(ts, "dateDebut", "dateDebut"),
+                offer,
                 base.isNumber() ? base.asDouble() : null,
                 hp.isNumber() ? hp.asDouble() : null,
                 hc.isNumber() ? hc.asDouble() : null,
-                ts.path("abo").hasNonNull("prixAboTTC") ? ts.path("abo").get("prixAboTTC").asDouble() : null);
+                ts.path("abo").hasNonNull("prixAboTTC")
+                        ? ts.path("abo").get("prixAboTTC").asDouble()
+                        : null);
     }
 
     private static Double num(JsonNode n, String field) {
@@ -139,6 +174,6 @@ public final class GazDeBordeauxMapper {
         for (String f : fields) {
             if (n.hasNonNull(f)) return LocalDate.parse(n.get(f).asText().substring(0, 10));
         }
-        return LocalDate.now();
+        return LocalDate.now(PARIS);
     }
 }

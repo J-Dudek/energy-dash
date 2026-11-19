@@ -6,7 +6,6 @@ import fr.byj6n.conso.model.Invoice;
 import fr.byj6n.conso.model.Reading;
 import fr.byj6n.conso.port.ProviderClient;
 import fr.byj6n.conso.port.ProviderSession;
-
 import java.io.IOException;
 import java.net.CookieManager;
 import java.net.CookiePolicy;
@@ -23,18 +22,20 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Client de l'espace perso Iléo (eau de la MEL). Pas d'API : formulaire de connexion
- * classique + pages HTML, session portée par cookie.
+ * Client de l'espace perso Iléo (eau de la MEL). Pas d'API : formulaire de connexion classique +
+ * pages HTML, session portée par cookie.
+ *
  * <ul>
- *   <li>POST /connexion.aspx email, password, valider, connexion=1</li>
- *   <li>GET /espaceperso/mes-consommations-facturees.aspx, /espaceperso/gerer-factures.aspx</li>
- *   <li>GET /common/pdfReader.aspx?cleDoc=... → PDF</li>
+ *   <li>POST /connexion.aspx email, password, valider, connexion=1
+ *   <li>GET /espaceperso/mes-consommations-facturees.aspx, /espaceperso/gerer-factures.aspx
+ *   <li>GET /common/pdfReader.aspx?cleDoc=... → PDF
  * </ul>
  */
 public class IleoClient implements ProviderClient {
 
     private static final String BASE = "https://www.mel-ileo.fr";
-    private static final String UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36";
+    private static final String UA =
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36";
 
     private final CollectorProperties.Account account;
 
@@ -50,11 +51,12 @@ public class IleoClient implements ProviderClient {
     @Override
     public ProviderSession connect() throws IOException, InterruptedException {
         // Un client HTTP (donc un jeu de cookies) par session.
-        HttpClient http = HttpClient.newBuilder()
-                .cookieHandler(new CookieManager(null, CookiePolicy.ACCEPT_ALL))
-                .followRedirects(HttpClient.Redirect.NORMAL)
-                .connectTimeout(Duration.ofSeconds(20))
-                .build();
+        HttpClient http =
+                HttpClient.newBuilder()
+                        .cookieHandler(new CookieManager(null, CookiePolicy.ACCEPT_ALL))
+                        .followRedirects(HttpClient.Redirect.NORMAL)
+                        .connectTimeout(Duration.ofSeconds(20))
+                        .build();
 
         get(http, "/connexion.aspx"); // cookie de session ASP.NET
 
@@ -63,14 +65,19 @@ public class IleoClient implements ProviderClient {
         form.put("password", account.password());
         form.put("valider", "je me connecte");
         form.put("connexion", "1");
-        String body = form.entrySet().stream()
-                .map(e -> enc(e.getKey()) + "=" + enc(e.getValue()))
-                .collect(Collectors.joining("&"));
-        HttpResponse<String> resp = http.send(req("/connexion.aspx")
-                .header("Content-Type", "application/x-www-form-urlencoded")
-                .header("Origin", BASE)
-                .header("Referer", BASE + "/connexion.aspx")
-                .POST(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
+        String body =
+                form.entrySet().stream()
+                        .map(e -> enc(e.getKey()) + "=" + enc(e.getValue()))
+                        .collect(Collectors.joining("&"));
+        HttpResponse<String> resp =
+                http.send(
+                        req("/connexion.aspx")
+                                .header("Content-Type", "application/x-www-form-urlencoded")
+                                .header("Origin", BASE)
+                                .header("Referer", BASE + "/connexion.aspx")
+                                .POST(HttpRequest.BodyPublishers.ofString(body))
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString());
         requireIleoHost(resp);
         if (resp.statusCode() >= 400) {
             throw new IOException("Iléo : échec de connexion (HTTP " + resp.statusCode() + ")");
@@ -107,14 +114,25 @@ public class IleoClient implements ProviderClient {
             if (invoice.sourceRef() == null) {
                 throw new IOException("Iléo : pas de lien PDF pour la facture " + invoice.number());
             }
-            HttpResponse<java.io.InputStream> resp = http.send(req("/common/pdfReader.aspx?cleDoc=" + enc(invoice.sourceRef()))
-                    .header("Referer", BASE + "/espaceperso/gerer-factures.aspx")
-                    .GET().build(), HttpResponse.BodyHandlers.ofInputStream());
+            HttpResponse<java.io.InputStream> resp =
+                    http.send(
+                            req("/common/pdfReader.aspx?cleDoc=" + enc(invoice.sourceRef()))
+                                    .header("Referer", BASE + "/espaceperso/gerer-factures.aspx")
+                                    .GET()
+                                    .build(),
+                            HttpResponse.BodyHandlers.ofInputStream());
             requireIleoHost(resp);
-            byte[] pdf = resp.statusCode() == 200 ? Bodies.readAtMost(resp.body(), Bodies.MAX_PDF_BYTES) : new byte[0];
-            if (resp.statusCode() != 200 || pdf.length < 5 || !new String(pdf, 0, 5).equals("%PDF-")) {
-                throw new IOException("Iléo : téléchargement de la facture " + invoice.number()
-                        + " impossible (HTTP " + resp.statusCode() + ")");
+            byte[] pdf =
+                    resp.statusCode() == 200
+                            ? Bodies.readAtMost(resp.body(), Bodies.MAX_PDF_BYTES)
+                            : new byte[0];
+            if (resp.statusCode() != 200 || !Bodies.isPdf(pdf)) {
+                throw new IOException(
+                        "Iléo : téléchargement de la facture "
+                                + invoice.number()
+                                + " impossible (HTTP "
+                                + resp.statusCode()
+                                + ")");
             }
             return pdf;
         }
@@ -132,8 +150,10 @@ public class IleoClient implements ProviderClient {
         }
     }
 
-    private static String get(HttpClient http, String path) throws IOException, InterruptedException {
-        HttpResponse<String> resp = http.send(req(path).GET().build(), HttpResponse.BodyHandlers.ofString());
+    private static String get(HttpClient http, String path)
+            throws IOException, InterruptedException {
+        HttpResponse<String> resp =
+                http.send(req(path).GET().build(), HttpResponse.BodyHandlers.ofString());
         requireIleoHost(resp);
         if (resp.statusCode() != 200) {
             throw new IOException("Iléo : GET " + path + " → HTTP " + resp.statusCode());
@@ -142,13 +162,14 @@ public class IleoClient implements ProviderClient {
     }
 
     /**
-     * Les redirections sont suivies (l'ASP.NET en fait à la connexion), mais jamais vers un autre hôte :
-     * on refuse de poursuivre une session, cookies compris, ailleurs que chez Iléo.
+     * Les redirections sont suivies (l'ASP.NET en fait à la connexion), mais jamais vers un autre
+     * hôte : on refuse de poursuivre une session, cookies compris, ailleurs que chez Iléo.
      */
     private static void requireIleoHost(HttpResponse<?> resp) throws IOException {
         String host = resp.uri().getHost();
         if (host == null || !host.equals(URI.create(BASE).getHost())) {
-            throw new IOException("Iléo : redirection inattendue vers un autre hôte, session abandonnée");
+            throw new IOException(
+                    "Iléo : redirection inattendue vers un autre hôte, session abandonnée");
         }
     }
 

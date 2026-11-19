@@ -1,12 +1,12 @@
 package fr.byj6n.conso.http;
 
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import java.nio.charset.StandardCharsets;
+import org.junit.jupiter.api.Test;
 
 class BodiesTest {
 
@@ -20,5 +20,12 @@ class BodiesTest {
         assertThatThrownBy(() -> Bodies.readAtMost(new ByteArrayInputStream(new byte[101]), 100))
                 .isInstanceOf(IOException.class)
                 .hasMessageContaining("trop volumineuse");
+    }
+
+    @Test
+    void reconnaitLaSignatureDUnPdf() {
+        assertThat(Bodies.isPdf("%PDF-1.7 ...".getBytes(StandardCharsets.US_ASCII))).isTrue();
+        assertThat(Bodies.isPdf("<html>".getBytes(StandardCharsets.US_ASCII))).isFalse();
+        assertThat(Bodies.isPdf(new byte[3])).isFalse();
     }
 }

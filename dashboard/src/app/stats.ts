@@ -1,4 +1,4 @@
-import { Energy, InvoiceRow, ReadingRow, TariffRow } from './models';
+import type { Energy, InvoiceRow, ReadingRow, TariffRow } from './models';
 
 const DAY = 86_400_000;
 
@@ -31,11 +31,16 @@ export interface Kpi {
 }
 
 const monthFmt = new Intl.DateTimeFormat('fr-FR', { month: 'short', year: '2-digit' });
-const dayFmt = new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+const dayFmt = new Intl.DateTimeFormat('fr-FR', {
+  day: '2-digit',
+  month: '2-digit',
+  year: '2-digit',
+});
 
 /** Électricité et gaz : un point par mois. Eau : un point par facture, ramené en litres/jour. */
 export function series(rows: ReadingRow[], energy: Energy): Point[] {
-  const heating = energy === 'gas' ? heatingByMonth(rows) : new Map<string, { hours: number; days: number }>();
+  const heating =
+    energy === 'gas' ? heatingByMonth(rows) : new Map<string, { hours: number; days: number }>();
   return rows
     .filter((r) => r.energy === energy)
     .map((r) => {
@@ -77,8 +82,8 @@ function heatingOf(
   heating: Map<string, { hours: number; days: number }>,
 ): Pick<Point, 'heatingHours' | 'heatingDays' | 'monthDays' | 'kwhPerHeatingHour'> {
   const key = r.periodEnd.slice(0, 7);
-  const [y, m] = key.split('-').map(Number);
-  const monthDays = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const [year = 0, month = 1] = key.split('-').map(Number);
+  const monthDays = new Date(Date.UTC(year, month, 0)).getUTCDate();
   const h = heating.get(key);
   if (!h) return { heatingHours: null, heatingDays: 0, monthDays, kwhPerHeatingHour: null };
   const complete = h.days >= monthDays;
@@ -91,7 +96,12 @@ function heatingOf(
   };
 }
 
-export function kpi(rows: ReadingRow[], invoices: InvoiceRow[], tariffs: TariffRow[], energy: Energy): Kpi {
+export function kpi(
+  rows: ReadingRow[],
+  invoices: InvoiceRow[],
+  tariffs: TariffRow[],
+  energy: Energy,
+): Kpi {
   const pts = series(rows, energy);
   const latest = pts.at(-1) ?? null;
   let previousYear: Point | null = null;
@@ -101,7 +111,9 @@ export function kpi(rows: ReadingRow[], invoices: InvoiceRow[], tariffs: TariffR
     previousYear =
       pts
         .filter((p) => Math.abs(p.date.getTime() - target) <= 45 * DAY)
-        .sort((a, b) => Math.abs(a.date.getTime() - target) - Math.abs(b.date.getTime() - target))[0] ?? null;
+        .sort(
+          (a, b) => Math.abs(a.date.getTime() - target) - Math.abs(b.date.getTime() - target),
+        )[0] ?? null;
   }
   const deltaPct =
     latest && previousYear && previousYear.value > 0
@@ -133,7 +145,9 @@ export function kpi(rows: ReadingRow[], invoices: InvoiceRow[], tariffs: TariffR
 
 /** Tarif en vigueur : le plus récent dont la date d'effet est passée (à défaut, le plus récent). */
 function currentTariff(tariffs: TariffRow[], energy: Energy): TariffRow | null {
-  const own = tariffs.filter((t) => t.energy === energy).sort((a, b) => b.validFrom.localeCompare(a.validFrom));
+  const own = tariffs
+    .filter((t) => t.energy === energy)
+    .sort((a, b) => b.validFrom.localeCompare(a.validFrom));
   const now = new Date().toISOString();
   return own.find((t) => t.validFrom <= now) ?? own[0] ?? null;
 }
@@ -154,10 +168,15 @@ function unitPrice(
 ): { value: number | null; hint: string } {
   const none = { value: null, hint: '' };
   if (energy === 'water') {
-    const inv = invoices
-      .filter((i) => i.energy === 'water' && (i.amount ?? 0) > 0 && (i.volume ?? 0) > 0)
-      .sort((a, b) => b.date.localeCompare(a.date))[0];
-    return inv ? { value: inv.amount! / inv.volume!, hint: 'dernière facture, tout compris' } : none;
+    const latestFirst = invoices
+      .filter((i) => i.energy === 'water')
+      .sort((a, b) => b.date.localeCompare(a.date));
+    for (const i of latestFirst) {
+      if (i.amount !== null && i.amount > 0 && i.volume !== null && i.volume > 0) {
+        return { value: i.amount / i.volume, hint: 'dernière facture, tout compris' };
+      }
+    }
+    return none;
   }
   const t = currentTariff(tariffs, energy);
   if (!t) return none;
@@ -166,9 +185,14 @@ function unitPrice(
   const latest = pts.at(-1);
   if (!latest || t.hp === null || t.hc === null) return none;
   const from = latest.date.getTime() - 365 * DAY;
-  const split = pts.filter((p) => p.date.getTime() > from && p.hp !== null && p.hc !== null);
-  const hp = split.reduce((s, p) => s + p.hp!, 0);
-  const hc = split.reduce((s, p) => s + p.hc!, 0);
+  let hp = 0;
+  let hc = 0;
+  for (const p of pts) {
+    if (p.date.getTime() > from && p.hp !== null && p.hc !== null) {
+      hp += p.hp;
+      hc += p.hc;
+    }
+  }
   if (hp + hc === 0) return none;
   const pctHc = Math.round((hc / (hp + hc)) * 100);
   return {
@@ -180,7 +204,8 @@ function unitPrice(
 /** Dernière facture d'une énergie. L'offre duale Gaz de Bordeaux peut tout regrouper sur la facture élec. */
 export function latestInvoice(invoices: InvoiceRow[], energy: Energy): InvoiceRow | null {
   const own = invoices.filter((i) => i.energy === energy && i.fileId);
-  if (own.length) return own.sort((a, b) => b.date.localeCompare(a.date))[0];
+  const latestOwn = own.sort((a, b) => b.date.localeCompare(a.date))[0];
+  if (latestOwn) return latestOwn;
   if (energy === 'gas') {
     const dual = invoices.filter((i) => i.provider === 'gdb' && i.fileId);
     return dual.sort((a, b) => b.date.localeCompare(a.date))[0] ?? null;
@@ -190,5 +215,8 @@ export function latestInvoice(invoices: InvoiceRow[], energy: Energy): InvoiceRo
 
 export function invoiceFilename(i: InvoiceRow): string {
   // le numéro vient du fournisseur : le nom de fichier ne doit contenir ni séparateur de chemin ni caractère spécial
-  return `${i.provider}-${i.energy}-${i.date.slice(0, 10)}-${i.number}.pdf`.replace(/[^A-Za-z0-9._-]/g, '_');
+  return `${i.provider}-${i.energy}-${i.date.slice(0, 10)}-${i.number}.pdf`.replace(
+    /[^A-Za-z0-9._-]/g,
+    '_',
+  );
 }

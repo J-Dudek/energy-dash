@@ -1,29 +1,28 @@
 package fr.byj6n.conso.appwrite;
 
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.sun.net.httpserver.HttpServer;
 import fr.byj6n.conso.CollectorProperties;
 import fr.byj6n.conso.model.Invoice;
 import fr.byj6n.conso.model.Reading;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /** Vérifie les appels REST envoyés à Appwrite contre un faux serveur local. */
 class AppwriteStoreTest {
 
-    record Call(String method, String path, String key, String body) {
-    }
+    record Call(String method, String path, String key, String body) {}
 
     private HttpServer server;
     private final List<Call> calls = new CopyOnWriteArrayList<>();
@@ -33,20 +32,39 @@ class AppwriteStoreTest {
 
     @BeforeEach
     void start() throws Exception {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/v1", ex -> {
-            String body = new String(ex.getRequestBody().readAllBytes(), StandardCharsets.ISO_8859_1);
-            String path = ex.getRequestURI().getPath();
-            calls.add(new Call(ex.getRequestMethod(), path, ex.getRequestHeaders().getFirst("X-Appwrite-Key"), body));
-            int status = ex.getRequestMethod().equals("GET") && path.contains("/files/") ? fileGetStatus : 200;
-            byte[] out = "{}".getBytes();
-            ex.sendResponseHeaders(status, out.length);
-            ex.getResponseBody().write(out);
-            ex.close();
-        });
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+        server.createContext(
+                "/v1",
+                ex -> {
+                    String body =
+                            new String(
+                                    ex.getRequestBody().readAllBytes(),
+                                    StandardCharsets.ISO_8859_1);
+                    String path = ex.getRequestURI().getPath();
+                    calls.add(
+                            new Call(
+                                    ex.getRequestMethod(),
+                                    path,
+                                    ex.getRequestHeaders().getFirst("X-Appwrite-Key"),
+                                    body));
+                    int status =
+                            ex.getRequestMethod().equals("GET") && path.contains("/files/")
+                                    ? fileGetStatus
+                                    : 200;
+                    byte[] out = "{}".getBytes(StandardCharsets.UTF_8);
+                    ex.sendResponseHeaders(status, out.length);
+                    ex.getResponseBody().write(out);
+                    ex.close();
+                });
         server.start();
-        var cfg = new CollectorProperties.Appwrite("http://127.0.0.1:" + server.getAddress().getPort() + "/v1",
-                "proj", "secret-key", "conso", "invoices", "users");
+        var cfg =
+                new CollectorProperties.Appwrite(
+                        "http://127.0.0.1:" + server.getAddress().getPort() + "/v1",
+                        "proj",
+                        "secret-key",
+                        "conso",
+                        "invoices",
+                        "users");
         store = new AppwriteStore(new AppwriteRest(cfg, mapper), cfg);
     }
 
@@ -57,12 +75,23 @@ class AppwriteStoreTest {
 
     @Test
     void upsertReleve() throws Exception {
-        store.upsert(new Reading("gdb", "electricity", "month", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31),
-                882, "kWh", 311.0, 571.0, 4.0));
+        store.upsert(
+                new Reading(
+                        "gdb",
+                        "electricity",
+                        "month",
+                        LocalDate.of(2026, 1, 1),
+                        LocalDate.of(2026, 1, 31),
+                        882,
+                        "kWh",
+                        311.0,
+                        571.0,
+                        4.0));
 
         Call c = calls.getFirst();
         assertThat(c.method()).isEqualTo("PUT");
-        assertThat(c.path()).isEqualTo("/v1/tablesdb/conso/tables/readings/rows/gdb-electricity-2026-01-31");
+        assertThat(c.path())
+                .isEqualTo("/v1/tablesdb/conso/tables/readings/rows/gdb-electricity-2026-01-31");
         assertThat(c.key()).isEqualTo("secret-key");
         JsonNode data = mapper.readTree(c.body()).path("data");
         assertThat(data.path("quantity").asDouble()).isEqualTo(882.0);
@@ -72,32 +101,60 @@ class AppwriteStoreTest {
     @Test
     void factureNouvelleEnvoieLePdf() throws Exception {
         AtomicInteger downloads = new AtomicInteger();
-        Invoice inv = new Invoice("ileo", "water", "1000000003", LocalDate.of(2026, 11, 13), 295.87, 64.0, 64.0, "DOC", null);
+        Invoice inv =
+                new Invoice(
+                        "ileo",
+                        "water",
+                        "1000000003",
+                        LocalDate.of(2026, 11, 13),
+                        295.87,
+                        64.0,
+                        64.0,
+                        "DOC",
+                        null);
 
-        boolean uploaded = store.upsert(inv, () -> {
-            downloads.incrementAndGet();
-            return "%PDF-1.7 fake".getBytes();
-        });
+        boolean uploaded =
+                store.upsert(
+                        inv,
+                        () -> {
+                            downloads.incrementAndGet();
+                            return "%PDF-1.7 fake".getBytes(StandardCharsets.UTF_8);
+                        });
 
         assertThat(uploaded).isTrue();
         assertThat(downloads).hasValue(1);
         assertThat(calls).extracting(Call::method).containsExactly("GET", "POST", "PUT");
         Call upload = calls.get(1);
         assertThat(upload.path()).isEqualTo("/v1/storage/buckets/invoices/files");
-        assertThat(upload.body()).contains("name=\"fileId\"\r\n\r\nileo-1000000003\r\n", "%PDF-1.7 fake");
-        assertThat(mapper.readTree(calls.get(2).body()).path("data").path("fileId").asText()).isEqualTo("ileo-1000000003");
+        assertThat(upload.body())
+                .contains("name=\"fileId\"\r\n\r\nileo-1000000003\r\n", "%PDF-1.7 fake");
+        assertThat(mapper.readTree(calls.get(2).body()).path("data").path("fileId").asText())
+                .isEqualTo("ileo-1000000003");
     }
 
     @Test
     void factureDejaPresenteNeRetelechargePas() throws Exception {
         fileGetStatus = 200;
         AtomicInteger downloads = new AtomicInteger();
-        Invoice inv = new Invoice("gdb", "electricity", "88000001", LocalDate.of(2026, 7, 5), 1396.05, 0.0, null, "x", 1L);
+        Invoice inv =
+                new Invoice(
+                        "gdb",
+                        "electricity",
+                        "88000001",
+                        LocalDate.of(2026, 7, 5),
+                        1396.05,
+                        0.0,
+                        null,
+                        "x",
+                        1L);
 
-        boolean uploaded = store.upsert(inv, () -> {
-            downloads.incrementAndGet();
-            return new byte[0];
-        });
+        boolean uploaded =
+                store.upsert(
+                        inv,
+                        () -> {
+                            downloads.incrementAndGet();
+                            return new byte[0];
+                        });
 
         assertThat(uploaded).isFalse();
         assertThat(downloads).hasValue(0);

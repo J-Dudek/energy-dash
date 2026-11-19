@@ -1,10 +1,9 @@
 package fr.byj6n.conso.model;
 
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.LocalDate;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
 
 class IdsTest {
 
@@ -36,7 +35,17 @@ class IdsTest {
 
     @Test
     void numeroDeFactureHostileNeFaitPasEchouerLaLigne() {
-        var inv = new Invoice("ileo", "water", "../../etc/passwd\" ; x", LocalDate.of(2026, 1, 1), 1.0, 0.0, null, "r", null);
+        var inv =
+                new Invoice(
+                        "ileo",
+                        "water",
+                        "../../etc/passwd\" ; x",
+                        LocalDate.of(2026, 1, 1),
+                        1.0,
+                        0.0,
+                        null,
+                        "r",
+                        null);
 
         assertThat(inv.rowId()).matches("[a-zA-Z0-9][a-zA-Z0-9._-]{0,35}");
     }

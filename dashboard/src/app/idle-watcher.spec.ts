@@ -13,7 +13,7 @@ describe('IdleWatcher', () => {
     return { onIdle, advance: (ms: number) => (now += ms) };
   }
 
-  it('n\'est pas inactif juste après le démarrage', () => {
+  it("n'est pas inactif juste après le démarrage", () => {
     setup();
     expect(watcher!.isIdle()).toBe(false);
   });
@@ -26,7 +26,7 @@ describe('IdleWatcher', () => {
     expect(watcher!.isIdle()).toBe(true);
   });
 
-  it('une activité repousse l\'échéance', () => {
+  it("une activité repousse l'échéance", () => {
     const { advance } = setup(60_000);
     advance(50_000);
     window.dispatchEvent(new Event('pointerdown'));

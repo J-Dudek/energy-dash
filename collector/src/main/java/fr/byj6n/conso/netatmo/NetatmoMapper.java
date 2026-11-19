@@ -1,8 +1,6 @@
 package fr.byj6n.conso.netatmo;
 
 import fr.byj6n.conso.model.Reading;
-import tools.jackson.databind.JsonNode;
-
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -11,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Convertit les réponses JSON de l'API Netatmo en modèle normalisé.
@@ -32,19 +31,20 @@ final class NetatmoMapper {
     static final String ENERGY = "heating";
     static final ZoneId ZONE = ZoneId.of("Europe/Paris");
 
-    private NetatmoMapper() {
-    }
+    private NetatmoMapper() {}
 
     /** Relais (device_id) et thermostat (module_id) à interroger. */
-    record Thermostat(String deviceId, String moduleId) {
-    }
+    record Thermostat(String deviceId, String moduleId) {}
 
     /** Premier thermostat NATherm1 relié à un relais. */
     static Optional<Thermostat> thermostat(JsonNode homesData) {
         for (JsonNode home : homesData.path("body").path("homes")) {
             for (JsonNode module : home.path("modules")) {
-                if ("NATherm1".equals(module.path("type").asText()) && module.hasNonNull("bridge")) {
-                    return Optional.of(new Thermostat(module.get("bridge").asText(), module.path("id").asText()));
+                if ("NATherm1".equals(module.path("type").asText())
+                        && module.hasNonNull("bridge")) {
+                    return Optional.of(
+                            new Thermostat(
+                                    module.get("bridge").asText(), module.path("id").asText()));
                 }
             }
         }
@@ -62,19 +62,33 @@ final class NetatmoMapper {
                 int i = 0;
                 for (JsonNode v : chunk.path("value")) {
                     JsonNode first = v.isArray() ? v.path(0) : v;
-                    if (first.isNumber()) seconds.merge(day(begin + i * step), first.asDouble(), Double::sum);
+                    if (first.isNumber())
+                        seconds.merge(day(begin + i * step), first.asDouble(), Double::sum);
                     i++;
                 }
             }
         } else {
             for (var e : body.properties()) {
                 JsonNode first = e.getValue().path(0);
-                if (first.isNumber()) seconds.merge(day(Long.parseLong(e.getKey())), first.asDouble(), Double::sum);
+                if (first.isNumber())
+                    seconds.merge(day(Long.parseLong(e.getKey())), first.asDouble(), Double::sum);
             }
         }
         List<Reading> out = new ArrayList<>();
-        seconds.forEach((date, s) -> out.add(new Reading(PROVIDER, ENERGY, "day", date, date,
-                Math.round(s / 3600.0 * 100) / 100.0, "h", null, null, null)));
+        seconds.forEach(
+                (date, s) ->
+                        out.add(
+                                new Reading(
+                                        PROVIDER,
+                                        ENERGY,
+                                        "day",
+                                        date,
+                                        date,
+                                        Math.round(s / 3600.0 * 100) / 100.0,
+                                        "h",
+                                        null,
+                                        null,
+                                        null)));
         return out;
     }
 

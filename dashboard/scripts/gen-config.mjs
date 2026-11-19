@@ -20,7 +20,9 @@ for (const line of readFileSync(envPath, 'utf8').split(/\r?\n/)) {
 const endpoint = env.CONSO_APPWRITE_PUBLIC_ENDPOINT;
 const projectId = env.CONSO_APPWRITE_PROJECT_ID;
 if (!endpoint || !projectId) {
-  console.error('[gen-config] CONSO_APPWRITE_PUBLIC_ENDPOINT / CONSO_APPWRITE_PROJECT_ID manquants dans .env');
+  console.error(
+    '[gen-config] CONSO_APPWRITE_PUBLIC_ENDPOINT / CONSO_APPWRITE_PROJECT_ID manquants dans .env',
+  );
   process.exit(1);
 }
 

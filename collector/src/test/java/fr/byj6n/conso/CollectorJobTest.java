@@ -1,5 +1,7 @@
 package fr.byj6n.conso;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.sun.net.httpserver.HttpServer;
 import fr.byj6n.conso.appwrite.AppwriteRest;
 import fr.byj6n.conso.appwrite.AppwriteSchema;
@@ -9,13 +11,10 @@ import fr.byj6n.conso.model.Reading;
 import fr.byj6n.conso.model.Tariff;
 import fr.byj6n.conso.port.ProviderClient;
 import fr.byj6n.conso.port.ProviderSession;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import tools.jackson.databind.ObjectMapper;
-
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
@@ -23,12 +22,14 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
 
 /**
- * Orchestration de la collecte, contre un faux Appwrite local et des fournisseurs factices :
- * ce qui est écrit, et surtout ce qui n'empêche pas le reste de passer.
+ * Orchestration de la collecte, contre un faux Appwrite local et des fournisseurs factices : ce qui
+ * est écrit, et surtout ce qui n'empêche pas le reste de passer.
  */
 class CollectorJobTest {
 
@@ -42,21 +43,32 @@ class CollectorJobTest {
 
     @BeforeEach
     void start() throws Exception {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/v1", ex -> {
-            ex.getRequestBody().readAllBytes();
-            String path = ex.getRequestURI().getPath();
-            calls.add(ex.getRequestMethod() + " " + path);
-            // aucun PDF n'est encore dans le bucket ; tout le reste répond OK
-            int status = ex.getRequestMethod().equals("GET") && path.contains("/files/") ? 404 : 200;
-            byte[] out = "{}".getBytes();
-            ex.sendResponseHeaders(status, out.length);
-            ex.getResponseBody().write(out);
-            ex.close();
-        });
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+        server.createContext(
+                "/v1",
+                ex -> {
+                    ex.getRequestBody().readAllBytes();
+                    String path = ex.getRequestURI().getPath();
+                    calls.add(ex.getRequestMethod() + " " + path);
+                    // aucun PDF n'est encore dans le bucket ; tout le reste répond OK
+                    int status =
+                            ex.getRequestMethod().equals("GET") && path.contains("/files/")
+                                    ? 404
+                                    : 200;
+                    byte[] out = "{}".getBytes(StandardCharsets.UTF_8);
+                    ex.sendResponseHeaders(status, out.length);
+                    ex.getResponseBody().write(out);
+                    ex.close();
+                });
         server.start();
-        var cfg = new CollectorProperties.Appwrite("http://127.0.0.1:" + server.getAddress().getPort() + "/v1",
-                "proj", "secret-key", "conso", "invoices", "users");
+        var cfg =
+                new CollectorProperties.Appwrite(
+                        "http://127.0.0.1:" + server.getAddress().getPort() + "/v1",
+                        "proj",
+                        "secret-key",
+                        "conso",
+                        "invoices",
+                        "users");
         var rest = new AppwriteRest(cfg, new ObjectMapper());
         schema = new AppwriteSchema(rest, cfg);
         store = new AppwriteStore(rest, cfg);
@@ -74,11 +86,12 @@ class CollectorJobTest {
 
         job(fake).run();
 
-        assertThat(calls).contains(
-                "PUT " + API + "readings/rows/ileo-water-2026-06-30",
-                "PUT " + API + "invoices/rows/ileo-F1",
-                "PUT " + API + "tariffs/rows/ileo-water-2026-01-01",
-                "POST /v1/storage/buckets/invoices/files");
+        assertThat(calls)
+                .contains(
+                        "PUT " + API + "readings/rows/ileo-water-2026-06-30",
+                        "PUT " + API + "invoices/rows/ileo-F1",
+                        "PUT " + API + "tariffs/rows/ileo-water-2026-01-01",
+                        "POST /v1/storage/buckets/invoices/files");
     }
 
     @Test
@@ -101,9 +114,10 @@ class CollectorJobTest {
 
         job(fake).run();
 
-        assertThat(calls).contains(
-                "PUT " + API + "readings/rows/ileo-water-2026-06-30",
-                "PUT " + API + "invoices/rows/ileo-F1");
+        assertThat(calls)
+                .contains(
+                        "PUT " + API + "readings/rows/ileo-water-2026-06-30",
+                        "PUT " + API + "invoices/rows/ileo-F1");
         assertThat(calls).noneMatch(c -> c.contains("/tariffs/rows/"));
     }
 
@@ -117,7 +131,12 @@ class CollectorJobTest {
 
         assertThat(calls).contains("PUT " + API + "invoices/rows/ileo-F2");
         assertThat(calls).doesNotContain("PUT " + API + "invoices/rows/ileo-F1");
-        assertThat(calls).contains("PUT " + API + "tariffs/rows/ileo-water-2026-01-01"); // l'étape suivante a bien eu lieu
+        assertThat(calls)
+                .contains(
+                        "PUT "
+                                + API
+                                + "tariffs/rows/ileo-water-2026-01-01"); // l'étape suivante a bien
+        // eu lieu
     }
 
     @Test
@@ -135,10 +154,11 @@ class CollectorJobTest {
         var entered = new CountDownLatch(1);
         var release = new CountDownLatch(1);
         var slow = new FakeProvider("ileo").withData();
-        slow.beforeReadings = () -> {
-            entered.countDown();
-            release.await(5, TimeUnit.SECONDS);
-        };
+        slow.beforeReadings =
+                () -> {
+                    entered.countDown();
+                    release.await(5, TimeUnit.SECONDS);
+                };
         var job = job(slow);
 
         Thread first = new Thread(job::run);
@@ -153,11 +173,21 @@ class CollectorJobTest {
     }
 
     private CollectorJob job(FakeProvider... providers) {
-        return new CollectorJob(new Providers(List.<ProviderClient>of(providers)), schema, store, props);
+        return new CollectorJob(
+                new Providers(List.<ProviderClient>of(providers)), schema, store, props);
     }
 
     private static Invoice invoice(String number) {
-        return new Invoice("ileo", "water", number, LocalDate.of(2026, 6, 2), 100.0, 0.0, 10.0, "ref-" + number, null);
+        return new Invoice(
+                "ileo",
+                "water",
+                number,
+                LocalDate.of(2026, 6, 2),
+                100.0,
+                0.0,
+                10.0,
+                "ref-" + number,
+                null);
     }
 
     @FunctionalInterface
@@ -173,8 +203,7 @@ class CollectorJobTest {
         IOException connectError;
         IOException tariffsError;
         Set<String> failingPdfs = Set.of();
-        Blocking beforeReadings = () -> {
-        };
+        Blocking beforeReadings = () -> {};
         List<Reading> readings = List.of();
         List<Invoice> invoices = List.of();
         List<Tariff> tariffs = List.of();
@@ -184,10 +213,31 @@ class CollectorJobTest {
         }
 
         FakeProvider withData() {
-            readings = List.of(new Reading(id, "water", "invoice", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 6, 30),
-                    64, "m3", null, null, null));
+            readings =
+                    List.of(
+                            new Reading(
+                                    id,
+                                    "water",
+                                    "invoice",
+                                    LocalDate.of(2026, 1, 1),
+                                    LocalDate.of(2026, 6, 30),
+                                    64,
+                                    "m3",
+                                    null,
+                                    null,
+                                    null));
             invoices = List.of(invoice("F1"));
-            tariffs = List.of(new Tariff(id, "water", LocalDate.of(2026, 1, 1), "OFFRE", 1.0, null, null, null));
+            tariffs =
+                    List.of(
+                            new Tariff(
+                                    id,
+                                    "water",
+                                    LocalDate.of(2026, 1, 1),
+                                    "OFFRE",
+                                    1.0,
+                                    null,
+                                    null,
+                                    null));
             return this;
         }
 
@@ -223,7 +273,7 @@ class CollectorJobTest {
         @Override
         public byte[] downloadPdf(Invoice invoice) throws IOException {
             if (failingPdfs.contains(invoice.number())) throw new IOException("PDF indisponible");
-            return "%PDF-1.7 fake".getBytes();
+            return "%PDF-1.7 fake".getBytes(StandardCharsets.UTF_8);
         }
     }
 }

@@ -1,7 +1,8 @@
 import { Injectable, signal } from '@angular/core';
-import { Account, AppwriteException, Client, Models, Query, TablesDB } from 'appwrite';
+import type { Models } from 'appwrite';
+import { Account, AppwriteException, Client, Query, TablesDB } from 'appwrite';
 import { validateConfig } from './config';
-import { AppConfig, InvoiceRow, ReadingRow, TariffRow } from './models';
+import type { AppConfig, InvoiceRow, ReadingRow, TariffRow } from './models';
 
 /**
  * Accès Appwrite côté navigateur. La config (endpoint, projet...) est lue au démarrage
@@ -27,10 +28,9 @@ export class AppwriteService {
   }
 
   async init(): Promise<void> {
-    const raw = await fetch('config.json', { cache: 'no-store' }).then((r) => {
-      if (!r.ok) throw new Error('config.json introuvable');
-      return r.json();
-    });
+    const response = await fetch('config.json', { cache: 'no-store' });
+    if (!response.ok) throw new Error('config.json introuvable');
+    const raw: unknown = await response.json();
     this.config = validateConfig(raw);
     this.client = new Client().setEndpoint(this.config.endpoint).setProject(this.config.projectId);
     this.account = new Account(this.client);
@@ -95,10 +95,10 @@ export class AppwriteService {
    * on la remet : mieux vaut une session fonctionnelle qu'une application inutilisable.
    */
   private async preferCookieSession(): Promise<void> {
-    let copy: string | null = null;
+    let copy: string | null;
     try {
       copy = localStorage.getItem('cookieFallback');
-      if (!copy) return;
+      if (copy === null) return;
       localStorage.removeItem('cookieFallback');
     } catch {
       return; // stockage indisponible
@@ -155,7 +155,9 @@ export class AppwriteService {
     a.href = blobUrl;
     a.download = filename;
     a.click();
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000);
+    setTimeout(() => {
+      URL.revokeObjectURL(blobUrl);
+    }, 10_000);
   }
 
   private async listAll<T>(tableId: string, queries: string[]): Promise<T[]> {

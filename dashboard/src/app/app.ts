@@ -1,11 +1,13 @@
-import { Component, computed, effect, inject, OnDestroy, OnInit, signal } from '@angular/core';
+import type { OnDestroy, OnInit } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AppwriteException } from 'appwrite';
 import { AppwriteService } from './appwrite.service';
 import { EnergyChart } from './energy-chart';
 import { IdleWatcher } from './idle-watcher';
-import { Energy, ENERGY_LABEL, InvoiceRow, PROVIDER_LABEL, ReadingRow, TariffRow } from './models';
+import type { Energy, InvoiceRow, ReadingRow, TariffRow } from './models';
+import { ENERGY_LABEL, PROVIDER_LABEL } from './models';
 import { invoiceFilename, kpi, series } from './stats';
 
 @Component({
@@ -33,15 +35,19 @@ export class App implements OnInit, OnDestroy {
   protected readonly selected = signal<Energy>('electricity');
   protected readonly showTable = signal(false);
   /** Filtre de la liste des factures : un fournisseur ("gdb", "ileo") ou tous. */
-  protected readonly invoiceProvider = signal<string | 'all'>('all');
+  protected readonly invoiceProvider = signal<string>('all');
 
   protected email = '';
   protected password = '';
 
-  protected readonly kpis = computed(() => this.energies.map((e) => kpi(this.readings(), this.invoices(), this.tariffs(), e)));
+  protected readonly kpis = computed(() =>
+    this.energies.map((e) => kpi(this.readings(), this.invoices(), this.tariffs(), e)),
+  );
   protected readonly points = computed(() => series(this.readings(), this.selected()));
   /** Fournisseurs présents dans les factures, pour proposer le filtre. */
-  protected readonly invoiceProviders = computed(() => [...new Set(this.invoices().map((i) => i.provider))].sort());
+  protected readonly invoiceProviders = computed(() =>
+    [...new Set(this.invoices().map((i) => i.provider))].sort(),
+  );
   protected readonly filteredInvoices = computed(() => {
     const p = this.invoiceProvider();
     return p === 'all' ? this.invoices() : this.invoices().filter((i) => i.provider === p);
@@ -60,7 +66,9 @@ export class App implements OnInit, OnDestroy {
     () => this.selected() === 'gas' && this.points().some((p) => p.heatingHours !== null),
   );
   protected readonly lastSync = computed(() => {
-    const dates = this.readings().map((r) => r.$updatedAt).sort();
+    const dates = this.readings()
+      .map((r) => r.$updatedAt)
+      .sort();
     return dates.at(-1) ?? null;
   });
 
@@ -89,7 +97,11 @@ export class App implements OnInit, OnDestroy {
     this.idle?.stop();
   }
 
-  async ngOnInit(): Promise<void> {
+  ngOnInit(): void {
+    void this.initialize();
+  }
+
+  private async initialize(): Promise<void> {
     try {
       await this.aw.init();
       if (this.aw.user()) await this.load();
@@ -122,7 +134,11 @@ export class App implements OnInit, OnDestroy {
     this.loading.set(true);
     this.error.set(null);
     try {
-      const [r, i, t] = await Promise.all([this.aw.readings(), this.aw.invoices(), this.aw.tariffs()]);
+      const [r, i, t] = await Promise.all([
+        this.aw.readings(),
+        this.aw.invoices(),
+        this.aw.tariffs(),
+      ]);
       this.tariffs.set(t);
       this.readings.set(r);
       this.invoices.set(i);
@@ -155,7 +171,8 @@ export class App implements OnInit, OnDestroy {
   }
 
   private message(e: unknown): string {
-    if (e instanceof AppwriteException && e.code === 429) return 'Trop de tentatives, réessaie dans quelques minutes.';
+    if (e instanceof AppwriteException && e.code === 429)
+      return 'Trop de tentatives, réessaie dans quelques minutes.';
     return e instanceof Error ? e.message : 'Erreur inattendue';
   }
 }

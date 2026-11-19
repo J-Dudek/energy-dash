@@ -1,10 +1,11 @@
-import { Component, ElementRef, OnDestroy, effect, input, viewChild } from '@angular/core';
+import type { ElementRef, OnDestroy } from '@angular/core';
+import { Component, effect, input, viewChild } from '@angular/core';
+import type { ChartDataset } from 'chart.js';
 import {
   BarController,
   BarElement,
   CategoryScale,
   Chart,
-  ChartDataset,
   Legend,
   LineController,
   LineElement,
@@ -12,10 +13,20 @@ import {
   PointElement,
   Tooltip,
 } from 'chart.js';
-import { Energy } from './models';
-import { Point } from './stats';
+import type { Energy } from './models';
+import type { Point } from './stats';
 
-Chart.register(BarController, BarElement, LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend);
+Chart.register(
+  BarController,
+  BarElement,
+  LineController,
+  LineElement,
+  PointElement,
+  CategoryScale,
+  LinearScale,
+  Tooltip,
+  Legend,
+);
 
 const nf = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 });
 
@@ -31,9 +42,14 @@ function css(el: HTMLElement, name: string): string {
  */
 @Component({
   selector: 'app-energy-chart',
-  template: `<div class="chart-box"><canvas #canvas [attr.aria-label]="ariaLabel()" role="img"></canvas></div>`,
+  template: `<div class="chart-box">
+    <canvas #canvas [attr.aria-label]="ariaLabel()" role="img"></canvas>
+  </div>`,
   styles: `
-    .chart-box { position: relative; height: 300px; }
+    .chart-box {
+      position: relative;
+      height: 300px;
+    }
   `,
 })
 export class EnergyChart implements OnDestroy {
@@ -44,10 +60,14 @@ export class EnergyChart implements OnDestroy {
   private readonly canvas = viewChild.required<ElementRef<HTMLCanvasElement>>('canvas');
   private chart?: Chart;
   private readonly media = window.matchMedia('(prefers-color-scheme: dark)');
-  private readonly onTheme = () => this.render();
+  private readonly onTheme = () => {
+    this.render();
+  };
 
   constructor() {
-    effect(() => this.render());
+    effect(() => {
+      this.render();
+    });
     this.media.addEventListener('change', this.onTheme);
   }
 
@@ -58,7 +78,8 @@ export class EnergyChart implements OnDestroy {
 
   private render(): void {
     const canvasEl = this.canvas().nativeElement;
-    const host = canvasEl.parentElement as HTMLElement;
+    const host = canvasEl.parentElement;
+    if (!host) return;
     const energy = this.energy();
     const pts = this.points();
     this.chart?.destroy();
@@ -66,8 +87,8 @@ export class EnergyChart implements OnDestroy {
     const surface = css(host, '--surface-1');
     const text2 = css(host, '--text-secondary');
     const grid = css(host, '--grid');
-    const hasHpHc = energy === 'electricity' && pts.some((p) => p.hp != null);
-    const hasHeating = energy === 'gas' && pts.some((p) => p.heatingHours != null);
+    const hasHpHc = energy === 'electricity' && pts.some((p) => p.hp !== null);
+    const hasHeating = energy === 'gas' && pts.some((p) => p.heatingHours !== null);
 
     const bar = {
       borderRadius: { topLeft: 4, topRight: 4 },
@@ -79,9 +100,22 @@ export class EnergyChart implements OnDestroy {
 
     const datasets = hasHpHc
       ? [
-          { label: 'Heures creuses', data: pts.map((p) => p.hc ?? 0), backgroundColor: css(host, '--series-2'), stack: 'e', ...bar,
-            borderRadius: 0, borderWidth: { top: 2, left: 1, right: 1, bottom: 0 } },
-          { label: 'Heures pleines', data: pts.map((p) => p.hp ?? 0), backgroundColor: css(host, '--series-1'), stack: 'e', ...bar },
+          {
+            label: 'Heures creuses',
+            data: pts.map((p) => p.hc ?? 0),
+            backgroundColor: css(host, '--series-2'),
+            stack: 'e',
+            ...bar,
+            borderRadius: 0,
+            borderWidth: { top: 2, left: 1, right: 1, bottom: 0 },
+          },
+          {
+            label: 'Heures pleines',
+            data: pts.map((p) => p.hp ?? 0),
+            backgroundColor: css(host, '--series-1'),
+            stack: 'e',
+            ...bar,
+          },
         ]
       : [
           {
@@ -93,7 +127,10 @@ export class EnergyChart implements OnDestroy {
         ];
 
     const heatColor = css(host, '--series-2');
-    const partial = (i: number) => pts[i].heatingDays < pts[i].monthDays; // mois incomplet : point creux
+    const partial = (i: number): boolean => {
+      const p = pts[i];
+      return p !== undefined && p.heatingDays < p.monthDays; // mois incomplet : point creux
+    };
     const allDatasets: ChartDataset<'bar' | 'line'>[] = hasHeating
       ? [
           ...datasets,
@@ -110,7 +147,8 @@ export class EnergyChart implements OnDestroy {
             pointRadius: 4,
             pointHoverRadius: 5,
             pointBorderColor: heatColor,
-            pointBackgroundColor: (ctx: { dataIndex: number }) => (partial(ctx.dataIndex) ? surface : heatColor),
+            pointBackgroundColor: (ctx: { dataIndex: number }) =>
+              partial(ctx.dataIndex) ? surface : heatColor,
             order: -1, // au-dessus des barres
           },
         ]
@@ -128,13 +166,21 @@ export class EnergyChart implements OnDestroy {
         animation: false,
         interaction: { mode: 'index', intersect: false },
         scales: {
-          x: { stacked: hasHpHc, grid: { display: false }, ticks: { color: text2, maxRotation: 0, autoSkip: true } },
+          x: {
+            stacked: hasHpHc,
+            grid: { display: false },
+            ticks: { color: text2, maxRotation: 0, autoSkip: true },
+          },
           y: {
             stacked: hasHpHc,
             beginAtZero: true,
             border: { display: false },
             grid: { color: grid },
-            ticks: { color: text2, callback: (v) => (compact() ? nf.format(Number(v)) : `${nf.format(Number(v))} ${unit}`) },
+            ticks: {
+              color: text2,
+              callback: (v) =>
+                compact() ? nf.format(Number(v)) : `${nf.format(Number(v))} ${unit}`,
+            },
           },
           ...(hasHeating
             ? {
@@ -143,7 +189,11 @@ export class EnergyChart implements OnDestroy {
                   beginAtZero: true,
                   border: { display: false },
                   grid: { display: false }, // une seule grille : celle des kWh
-                  ticks: { color: text2, callback: (v: string | number) => (compact() ? nf.format(Number(v)) : `${nf.format(Number(v))} h`) },
+                  ticks: {
+                    color: text2,
+                    callback: (v: string | number) =>
+                      compact() ? nf.format(Number(v)) : `${nf.format(Number(v))} h`,
+                  },
                 },
               }
             : {}),
@@ -154,7 +204,13 @@ export class EnergyChart implements OnDestroy {
             position: 'top',
             align: 'start',
             reverse: hasHpHc,
-            labels: { color: text2, boxWidth: 10, boxHeight: 10, useBorderRadius: true, borderRadius: 2 },
+            labels: {
+              color: text2,
+              boxWidth: 10,
+              boxHeight: 10,
+              useBorderRadius: true,
+              borderRadius: 2,
+            },
           },
           tooltip: {
             backgroundColor: css(host, '--surface-tooltip'),
@@ -166,8 +222,9 @@ export class EnergyChart implements OnDestroy {
             padding: 10,
             callbacks: {
               title: (items) => {
-                const p = pts[items[0].dataIndex];
-                if (energy !== 'water') return items[0].label;
+                const first = items[0];
+                const p = first ? pts[first.dataIndex] : undefined;
+                if (energy !== 'water' || !p) return first?.label ?? '';
                 const start = new Date(p.date.getTime() - (p.days - 1) * 86_400_000);
                 return `Du ${start.toLocaleDateString('fr-FR')} au ${p.date.toLocaleDateString('fr-FR')}`;
               },
@@ -176,18 +233,22 @@ export class EnergyChart implements OnDestroy {
                   ? ` ${item.dataset.label} : ${nf.format(Number(item.raw))} h`
                   : ` ${item.dataset.label} : ${nf.format(Number(item.raw))} ${unit}`,
               footer: (items) => {
-                const p = pts[items[0].dataIndex];
+                const first = items[0];
+                const p = first ? pts[first.dataIndex] : undefined;
                 const lines: string[] = [];
+                if (!p) return lines;
                 if (hasHpHc) lines.push(`Total : ${nf.format(p.raw)} kWh`);
-                if (energy === 'water') lines.push(`${nf.format(p.raw)} m³ facturés sur ${p.days} jours`);
-                if (p.heatingHours != null) {
+                if (energy === 'water')
+                  lines.push(`${nf.format(p.raw)} m³ facturés sur ${p.days} jours`);
+                if (p.heatingHours !== null) {
                   if (p.heatingDays < p.monthDays) {
                     lines.push(`Chauffe partielle : ${p.heatingDays} jours sur ${p.monthDays}`);
-                  } else if (p.kwhPerHeatingHour != null) {
+                  } else if (p.kwhPerHeatingHour !== null) {
                     lines.push(`${nf.format(p.kwhPerHeatingHour)} kWh par heure de chauffe`);
                   }
                 }
-                if (p.temperature != null) lines.push(`Température moyenne : ${nf.format(p.temperature)} °C`);
+                if (p.temperature !== null)
+                  lines.push(`Température moyenne : ${nf.format(p.temperature)} °C`);
                 return lines;
               },
             },
