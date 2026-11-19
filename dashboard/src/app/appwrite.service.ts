@@ -63,8 +63,7 @@ export class AppwriteService {
   async login(email: string, password: string): Promise<void> {
     this.notice.set(null);
     await this.account.createEmailPasswordSession({ email, password });
-    this.user.set(await this.account.get());
-    await this.preferCookieSession();
+    await this.openSession();
     this.passkeyOffer.set(passkeysSupported());
   }
 
@@ -78,8 +77,7 @@ export class AppwriteService {
       credential,
     });
     await this.account.createSession({ userId: token.userId, secret: token.secret });
-    this.user.set(await this.account.get());
-    await this.preferCookieSession();
+    await this.openSession();
   }
 
   /** Change l'adresse e-mail ; Appwrite exige le mot de passe actuel et remet la vérification de l'adresse à zéro. */
@@ -100,6 +98,18 @@ export class AppwriteService {
 
   async deletePasskey(passkeyId: string): Promise<void> {
     await this.account.deletePasskey({ passkeyId });
+  }
+
+  /**
+   * Fin d'une connexion : on règle d'abord la question du cookie *puis* on annonce l'utilisateur. Dès que `user`
+   * est posé, le tableau de bord s'affiche et charge ses données : si la copie de secours de la session était
+   * retirée à ce moment-là (cookie tiers bloqué, Chrome), ces requêtes partiraient sans session et on serait
+   * déconnecté aussitôt (« Session expirée »).
+   */
+  private async openSession(): Promise<void> {
+    const user = await this.account.get();
+    await this.preferCookieSession();
+    this.user.set(user);
   }
 
   async logout(): Promise<void> {
