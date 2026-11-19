@@ -1,4 +1,4 @@
-FROM maven:3.9-eclipse-temurin-25 AS build
+FROM maven:3.9-eclipse-temurin-26 AS build
 WORKDIR /src
 # .mvn/jvm.config : ouvre les API du compilateur à Error Prone et à google-java-format
 COPY pom.xml .
