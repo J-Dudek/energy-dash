@@ -1,0 +1,55 @@
+/* Palette : instance de référence du skill dataviz (validée daltonisme, clair et sombre). */
+:root {
+  color-scheme: light;
+  --surface-0: #f4f3f0;
+  --surface-1: #fcfcfb;
+  --surface-hover: #efeeea;
+  --surface-tooltip: #ffffff;
+  --border: #e2e0da;
+  --grid: #e8e6e1;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --accent: #2a78d6;
+  --on-accent: #ffffff;
+  --series-1: #2a78d6; /* bleu  : élec HP, eau */
+  --series-2: #eb6834; /* orange : élec HC */
+  --series-3: #1baf7a; /* aqua  : gaz */
+  --critical: #d03b3b;
+  --good-text: #0a7a0a;
+  --serious-text: #b9471c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --surface-hover: #262624;
+    --surface-tooltip: #262624;
+    --border: #33332f;
+    --grid: #2c2c29;
+    --text-primary: #f0efec;
+    --text-secondary: #c3c2b7;
+    --accent: #3987e5;
+    --on-accent: #ffffff;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --critical: #e66767;
+    --good-text: #3fc23f;
+    --serious-text: #ec835a;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; }
+
+body {
+  background: var(--surface-0);
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
