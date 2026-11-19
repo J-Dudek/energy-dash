@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+collector/target/
+dashboard/node_modules/
+dashboard/dist/
+dashboard/.angular/
+# Jeton Netatmo (secret, réécrit à chaque collecte)
+collector/data/
+/data/
+
+# IDE (peut contenir des variables d'environnement de lancement)
+.idea/

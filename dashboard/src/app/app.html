@@ -1,0 +1,40 @@
+@if (!ready()) {
+  <main class="center"><p class="muted">Chargement…</p></main>
+} @else if (!aw.user()) {
+  <main class="center">
+    <form class="login card" (ngSubmit)="login()">
+      <h1>Conso maison</h1>
+      <p class="muted">Eau, gaz et électricité</p>
+      <label
+        >E-mail
+        <input type="email" name="email" [(ngModel)]="email" autocomplete="username" required />
+      </label>
+      <label
+        >Mot de passe
+        <input
+          type="password"
+          name="password"
+          [(ngModel)]="password"
+          autocomplete="current-password"
+          required
+        />
+      </label>
+      @if (aw.notice(); as notice) {
+        <p class="muted small" role="status">{{ notice }}</p>
+      }
+      @if (error()) {
+        <p class="error" role="alert">{{ error() }}</p>
+      }
+      <button type="submit" class="primary" [disabled]="loading()">
+        {{ loading() ? 'Connexion…' : 'Se connecter' }}
+      </button>
+      @if (passkeySupported) {
+        <button type="button" class="ghost" (click)="loginWithPasskey()" [disabled]="loading()">
+          Se connecter avec une passkey
+        </button>
+      }
+    </form>
+  </main>
+} @else {
+  <router-outlet />
+}

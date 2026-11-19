@@ -1,0 +1,259 @@
+:host {
+  display: block;
+  min-height: 100vh;
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.kpi {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: border-color 0.15s;
+
+  &.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+}
+
+.kpi-select {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  text-align: left;
+  padding: 18px 20px 14px;
+  border-radius: 0;
+  flex: 1;
+
+  &:hover {
+    background: var(--surface-hover);
+  }
+}
+
+.kpi-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.hero {
+  font-size: 2.1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+
+  small {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+}
+
+.delta {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+
+  &.up {
+    color: var(--serious-text);
+  }
+
+  &.down {
+    color: var(--good-text);
+  }
+}
+
+.invoice {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-0);
+
+  div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+}
+
+.dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  margin-right: 6px;
+  vertical-align: -1px;
+
+  &[data-energy='electricity'] {
+    background: var(--series-1);
+  }
+
+  &[data-energy='gas'] {
+    background: var(--series-3);
+  }
+
+  &[data-energy='water'] {
+    background: var(--series-1);
+    border-radius: 50%;
+  }
+}
+
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+
+  p {
+    margin: 0;
+  }
+}
+
+.segmented {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-wrap: wrap;
+
+  button[role='tab'] {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+
+    &.on {
+      background: var(--surface-hover);
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+  }
+}
+
+.empty {
+  padding: 32px 0;
+  text-align: center;
+  margin: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  margin-top: 8px;
+}
+
+th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+th,
+td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+tbody tr:hover {
+  background: var(--surface-hover);
+}
+
+tfoot .total td {
+  font-weight: 700;
+  border-bottom: 0;
+  border-top: 2px solid var(--border);
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.table-scroll {
+  overflow-x: auto;
+} /* filet de sécurité : le tableau défile, pas la page */
+
+@media (width <= 640px) {
+  /* Cartes de synthèse : un carrousel à accroche plutôt que 3 cartes empilées avant le graphique */
+  .kpis {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    margin-inline: -16px;
+    padding-inline: 16px;
+    scroll-padding-inline: 16px;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  .kpi {
+    flex: 0 0 84%;
+    scroll-snap-align: start;
+  }
+
+  .kpi-select {
+    padding: 14px 16px 12px;
+  }
+
+  .invoice {
+    padding: 10px 16px;
+  }
+
+  .hero {
+    font-size: 1.9rem;
+  }
+
+  table {
+    font-size: 0.82rem;
+  }
+
+  th,
+  td {
+    padding: 9px 6px;
+  }
+
+  .hide-sm {
+    display: none;
+  } /* colonnes secondaires, repérées une à une (et non par rang) */
+}
+
+.offer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  border-color: var(--accent);
+
+  p {
+    margin: 4px 0 0;
+  }
+}
+
+.offer-actions {
+  display: flex;
+  gap: 8px;
+}

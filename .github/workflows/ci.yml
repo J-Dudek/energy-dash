@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  collector:
+    name: Collecteur (Java)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: collector
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      # Enforcer, tests, Spotless (formatage), SpotBugs + find-sec-bugs, Error Prone à la compilation
+      - run: mvn -B verify
+
+  dashboard:
+    name: Dashboard (Angular)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - run: npm ci --ignore-scripts
+      # ESLint, Stylelint, Prettier, tests, build de production
+      - run: npm run check
+      - run: npm audit --audit-level=high
+
+  docker:
+    name: Dockerfiles et scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hadolint/hadolint-action@v3.5.0
+        with:
+          dockerfile: collector/Dockerfile
+      - uses: hadolint/hadolint-action@v3.5.0
+        with:
+          dockerfile: dashboard/Dockerfile
+      - name: ShellCheck
+        run: shellcheck dashboard/docker-entrypoint.d/*.sh .githooks/pre-commit scripts/*.sh
+      - name: Construction des images (sans publication)
+        run: |
+          docker build -t conso-collector:ci collector
+          docker build -t conso-dashboard:ci dashboard
+
+  secrets:
+    name: Recherche de secrets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # tout l'historique : un secret supprimé plus tard reste dans les anciens commits
+      # Image officielle plutôt que gitleaks-action : l'action calcule `<premier commit de la PR>^..HEAD`, ce qui
+      # échoue quand la PR contient le commit racine du dépôt. Ici, tout l'historique est scanné, sans plage.
+      - name: gitleaks
+        run: >
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1
+          detect --source /repo --redact -v --exit-code 2 --no-banner

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Exclusions SpotBugs / find-sec-bugs. Chaque entrée doit être justifiée. -->
+<FindBugsFilter>
+    <!--
+        EI_EXPOSE_REP2 : "stocke une référence à un objet modifiable reçu en paramètre". Ici ce sont des services
+        injectés par le constructeur (ObjectMapper, AppwriteRest, AppwriteStore...) : partager la même instance est
+        précisément le but de l'injection de dépendances. Le motif reste actif pour tout autre cas via EI_EXPOSE_REP.
+    -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+</FindBugsFilter>

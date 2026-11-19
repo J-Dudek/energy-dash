@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Vérifie ce qui est sur le point d'être commité : secrets, formatage et lint, sur les seuls fichiers concernés.
+# Activation (une fois par clone) : git config core.hooksPath .githooks
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+mapfile -t staged < <(git diff --cached --name-only --diff-filter=ACMR)
+[ "${#staged[@]}" -gt 0 ] || exit 0
+
+fail=0
+
+# 1. Secrets (gitleaks, s'il est installé)
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact --no-banner || fail=1
+else
+  echo "pre-commit : gitleaks absent, recherche de secrets ignorée (https://github.com/gitleaks/gitleaks)" >&2
+fi
+
+# 2. Fichiers qui ne doivent jamais être commités
+for f in "${staged[@]}"; do
+  case "$f" in
+    .env | */.env | */netatmo-token.json | */data/*.json)
+      echo "pre-commit : $f ne doit pas être commité (secret)" >&2
+      fail=1
+      ;;
+  esac
+done
+
+# 3. Java : formatage Spotless
+if printf '%s\n' "${staged[@]}" | grep -q '^collector/.*\.java$'; then
+  mvn -q -f collector/pom.xml spotless:check || {
+    echo "pre-commit : formatage Java invalide. Corrige avec : (cd collector && mvn spotless:apply)" >&2
+    fail=1
+  }
+fi
+
+# 4. Angular : Prettier et ESLint sur les fichiers modifiés
+mapfile -t web < <(printf '%s\n' "${staged[@]}" | grep -E '^dashboard/.*\.(ts|html|scss|json|mjs|md)$' | sed 's#^dashboard/##' || true)
+if [ "${#web[@]}" -gt 0 ]; then
+  (cd dashboard && npx --no-install prettier --check "${web[@]}") || {
+    echo "pre-commit : formatage invalide. Corrige avec : (cd dashboard && npm run format)" >&2
+    fail=1
+  }
+  mapfile -t lintable < <(printf '%s\n' "${web[@]}" | grep -E '\.(ts|html)$' || true)
+  if [ "${#lintable[@]}" -gt 0 ]; then
+    (cd dashboard && npx --no-install eslint "${lintable[@]}") || fail=1
+  fi
+fi
+
+exit "$fail"
