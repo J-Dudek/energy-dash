@@ -39,6 +39,13 @@ Collecteur (6 h 17)                         Appareil (Android / iPhone)
 
 > Changer les clés VAPID plus tard invalide tous les abonnements : il faudra réactiver sur chaque appareil.
 
+## Logo et icônes
+
+Le logo source est `branding/logo.jpeg`. Le favicon et toutes les icônes (PWA, écran d'accueil iPhone, badge de
+notification) en sont tirés par `python3 scripts/generate-icons.py` (Pillow requis) : les traits sont épaissis pour
+rester lisibles en petit, et l'icône « maskable » garde le logo dans la zone que les launchers Android ne rognent pas.
+Pour changer de logo : remplace `branding/logo.jpeg` et relance le script.
+
 ## Ce que font les notifications
 
 - **Nouvelle facture** : « Nouvelle facture Iléo — eau · 295,87 € ». Au clic, la liste des factures s'ouvre sur
