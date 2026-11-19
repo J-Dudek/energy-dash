@@ -8,7 +8,7 @@ COPY . .
 RUN npx ng build --configuration production
 
 # Variante « unprivileged » : nginx tourne en utilisateur 101 (jamais root), sur le port 8080, sans aucune capability.
-FROM nginxinc/nginx-unprivileged:1.30-alpine
+FROM nginxinc/nginx-unprivileged:1.31-alpine
 COPY --chown=0:0 nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /src/dist/dashboard/browser /usr/share/nginx/html
 # config.json est régénéré au démarrage à partir des variables d'environnement (script exécutable dans git : 755)
