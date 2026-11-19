@@ -1,0 +1,88 @@
+import type { OnInit } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
+import { DatePipe, DecimalPipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
+import { AppwriteService } from './appwrite.service';
+import { EnergyChart } from './energy-chart';
+import { DashboardStore } from './dashboard-store';
+import type { Energy, InvoiceRow } from './models';
+import { ENERGY_LABEL, PROVIDER_LABEL } from './models';
+import { invoiceFilename, kpi, series } from './stats';
+
+@Component({
+  selector: 'app-dashboard',
+  imports: [RouterLink, DatePipe, DecimalPipe, EnergyChart],
+  templateUrl: './dashboard.html',
+  styleUrl: './dashboard.scss',
+})
+export class Dashboard implements OnInit {
+  protected readonly aw = inject(AppwriteService);
+  private readonly store = inject(DashboardStore);
+
+  protected readonly energies: Energy[] = ['electricity', 'gas', 'water'];
+  protected readonly ENERGY_LABEL = ENERGY_LABEL;
+  protected readonly PROVIDER_LABEL = PROVIDER_LABEL;
+
+  protected readonly downloading = signal<string | null>(null);
+
+  protected readonly loading = this.store.loading;
+  protected readonly error = this.store.error;
+  protected readonly readings = this.store.readings;
+  protected readonly invoices = this.store.invoices;
+  protected readonly tariffs = this.store.tariffs;
+  protected readonly selected = this.store.selected;
+  protected readonly showTable = this.store.showTable;
+  protected readonly invoiceProvider = this.store.invoiceProvider;
+
+  protected readonly kpis = computed(() =>
+    this.energies.map((e) => kpi(this.readings(), this.invoices(), this.tariffs(), e)),
+  );
+  protected readonly points = computed(() => series(this.readings(), this.selected()));
+  /** Fournisseurs présents dans les factures, pour proposer le filtre. */
+  protected readonly invoiceProviders = computed(() =>
+    [...new Set(this.invoices().map((i) => i.provider))].sort(),
+  );
+  protected readonly filteredInvoices = computed(() => {
+    const p = this.invoiceProvider();
+    return p === 'all' ? this.invoices() : this.invoices().filter((i) => i.provider === p);
+  });
+  /** Somme des factures affichées (montants absents ignorés). */
+  protected readonly invoiceTotals = computed(() => {
+    const list = this.filteredInvoices();
+    return {
+      count: list.length,
+      amount: list.reduce((sum, i) => sum + (i.amount ?? 0), 0),
+      due: list.reduce((sum, i) => sum + (i.amountDue ?? 0), 0),
+    };
+  });
+  /** Gaz uniquement : au moins un mois a des heures de chauffe (thermostat Netatmo). */
+  protected readonly hasHeating = computed(
+    () => this.selected() === 'gas' && this.points().some((p) => p.heatingHours !== null),
+  );
+  protected readonly lastSync = computed(() => {
+    const dates = this.readings()
+      .map((r) => r.$updatedAt)
+      .sort();
+    return dates.at(-1) ?? null;
+  });
+
+  ngOnInit(): void {
+    void this.store.load();
+  }
+
+  protected async load(): Promise<void> {
+    await this.store.load(true);
+  }
+
+  protected async download(inv: InvoiceRow): Promise<void> {
+    if (!inv.fileId) return;
+    this.downloading.set(inv.$id);
+    try {
+      await this.aw.download(inv.fileId, invoiceFilename(inv));
+    } catch (e) {
+      await this.store.fail(e);
+    } finally {
+      this.downloading.set(null);
+    }
+  }
+}

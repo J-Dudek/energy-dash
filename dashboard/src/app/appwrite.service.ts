@@ -1,7 +1,8 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, computed, signal } from '@angular/core';
 import type { Models } from 'appwrite';
-import { Account, AppwriteException, Client, Query, TablesDB } from 'appwrite';
+import { Account, AppwriteException, Client, ID, Query, TablesDB } from 'appwrite';
 import { validateConfig } from './config';
+import { createCredential, getCredential } from './passkey';
 import type { AppConfig, InvoiceRow, ReadingRow, TariffRow } from './models';
 
 /**
@@ -20,6 +21,12 @@ export class AppwriteService {
   private tables!: TablesDB;
 
   readonly user = signal<Models.User | null>(null);
+  /** Initiale affichée dans l'avatar (nom, à défaut e-mail). */
+  readonly initial = computed(() => {
+    const u = this.user();
+    const label = [u?.name, u?.email].find((v) => v !== undefined && v.trim() !== '');
+    return (label ?? '?').trim().charAt(0).toUpperCase();
+  });
   /** Pourquoi on a été déconnecté (inactivité, session trop ancienne ou expirée) : affiché sur l'écran de connexion. */
   readonly notice = signal<string | null>(null);
 
@@ -53,6 +60,40 @@ export class AppwriteService {
     await this.account.createEmailPasswordSession({ email, password });
     this.user.set(await this.account.get());
     await this.preferCookieSession();
+  }
+
+  /** Connexion par passkey : pas d'e-mail ni de mot de passe, l'appareil propose ses passkeys pour ce site. */
+  async loginWithPasskey(): Promise<void> {
+    this.notice.set(null);
+    const challenge = await this.account.createPasskeyToken();
+    const credential = await getCredential(challenge.publicKey);
+    const token = await this.account.updatePasskeyToken({
+      challengeId: challenge.$id,
+      credential,
+    });
+    await this.account.createSession({ userId: token.userId, secret: token.secret });
+    this.user.set(await this.account.get());
+    await this.preferCookieSession();
+  }
+
+  /** Change l'adresse e-mail ; Appwrite exige le mot de passe actuel et remet la vérification de l'adresse à zéro. */
+  async updateEmail(email: string, password: string): Promise<void> {
+    this.user.set(await this.account.updateEmail({ email, password }));
+  }
+
+  async passkeys(): Promise<Models.Passkey[]> {
+    return (await this.account.listPasskeys()).passkeys;
+  }
+
+  /** Ajoute une passkey à l'utilisateur connecté (Appwrite exige une connexion de moins de 10 minutes). */
+  async addPasskey(name: string): Promise<void> {
+    const challenge = await this.account.createPasskey({ passkeyId: ID.unique(), name });
+    const credential = await createCredential(challenge.publicKey);
+    await this.account.updatePasskeyVerification({ passkeyId: challenge.passkeyId, credential });
+  }
+
+  async deletePasskey(passkeyId: string): Promise<void> {
+    await this.account.deletePasskey({ passkeyId });
   }
 
   async logout(): Promise<void> {

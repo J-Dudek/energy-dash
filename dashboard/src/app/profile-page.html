@@ -1,0 +1,78 @@
+<header class="topbar">
+  <div>
+    <h1>Profil</h1>
+  </div>
+</header>
+
+<main class="content narrow">
+  <section class="card block">
+    <h2>Adresse e-mail</h2>
+    <p class="muted small">Actuellement : {{ aw.user()?.email }}</p>
+    <form (ngSubmit)="changeEmail()">
+      <label>
+        Nouvelle adresse
+        <input type="email" name="email" [(ngModel)]="newEmail" autocomplete="email" required />
+      </label>
+      <label>
+        Mot de passe actuel
+        <input
+          type="password"
+          name="password"
+          [(ngModel)]="password"
+          autocomplete="current-password"
+          required
+        />
+      </label>
+      @if (emailMessage(); as msg) {
+        <p class="small" role="status">{{ msg }}</p>
+      }
+      <button type="submit" class="primary sm" [disabled]="busy()">Enregistrer</button>
+    </form>
+  </section>
+
+  @if (passkeySupported) {
+    <section class="card block">
+      <h2>Passkeys</h2>
+      <p class="muted small">
+        Connexion sans mot de passe, avec l'empreinte, le visage ou le code de l'appareil.
+      </p>
+      @if (passkeys().length === 0) {
+        <p class="muted small">Aucune passkey enregistrée.</p>
+      } @else {
+        <ul>
+          @for (p of passkeys(); track p.$id) {
+            <li>
+              <span>
+                {{ p.name }}
+                <span class="muted small">
+                  ·
+                  @if (p.accessedAt) {
+                    utilisée le {{ p.accessedAt | date: 'dd/MM/yyyy' }}
+                  } @else {
+                    jamais utilisée
+                  }
+                </span>
+              </span>
+              <button type="button" class="link" (click)="removePasskey(p)" [disabled]="busy()">
+                Supprimer
+              </button>
+            </li>
+          }
+        </ul>
+      }
+      @if (passkeyMessage(); as msg) {
+        <p class="small" role="status">{{ msg }}</p>
+      }
+      <button type="button" class="ghost sm" (click)="addPasskey()" [disabled]="busy()">
+        Ajouter une passkey
+      </button>
+    </section>
+  }
+
+  <section class="card block">
+    <div class="actions">
+      <a routerLink="/" class="button ghost">Retour au tableau de bord</a>
+      <button type="button" class="ghost" (click)="logout()">Déconnexion</button>
+    </div>
+  </section>
+</main>
