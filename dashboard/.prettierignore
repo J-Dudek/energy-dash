@@ -1,0 +1,6 @@
+# Généré ou verrouillé : ne pas reformater
+package-lock.json
+dist/
+.angular/
+coverage/
+public/config.json

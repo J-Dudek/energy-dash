@@ -124,6 +124,28 @@ cd dashboard && npx ng test --watch=false         # tests (vitest)
   secret). Ce fichier est ignoré par git ; en Docker, le conteneur le régénère au démarrage.
   Avec `ng serve` directement, lance `npm run prestart` une fois avant.
 
+### Qualité du code
+
+Une seule commande par projet lance tout ; la CI GitHub (`.github/workflows/ci.yml`) fait la même chose.
+
+| | Commande | Ce qu'elle vérifie |
+|---|---|---|
+| **Collecteur** | `cd collector && mvn verify` | Enforcer (Java ≥ 25, Maven ≥ 3.9), **Error Prone** à la compilation (avertissements bloquants), tests, **Spotless** (google-java-format, style AOSP), **SpotBugs + find-sec-bugs** (bugs et failles : injections, crypto, XXE...) |
+| | `mvn spotless:apply` | Reformate le code Java |
+| **Dashboard** | `cd dashboard && npm run check` | **ESLint** (typescript-eslint strict avec les types, angular-eslint, accessibilité des templates, `no-unsanitized` contre le XSS), **Stylelint** (SCSS), **Prettier**, tests, build de production |
+| | `npm run lint:fix` · `npm run format` | Corrige le lint et le formatage |
+
+- **TypeScript strict** : `strict`, `noUncheckedIndexedAccess` et `strictTemplates` sont activés.
+- **`.mvn/jvm.config`** : ouvre les API internes du compilateur à Error Prone et à google-java-format
+  (obligatoire avec les JDK récents). Le Dockerfile du collecteur le copie.
+- **Hook de pré-commit** : vérifie les secrets (gitleaks, s'il est installé), le formatage Java et
+  Angular sur les seuls fichiers commités. À activer une fois par clone :
+  `git config core.hooksPath .githooks`.
+- **CI** : collecteur, dashboard, Dockerfiles (Hadolint), scripts (ShellCheck), construction des images, et
+  recherche de secrets dans tout l'historique (gitleaks). **CodeQL** analyse le Java et le TypeScript à chaque
+  PR et chaque semaine ; **Dependabot** propose les mises à jour de dépendances.
+- **EditorConfig** et `.gitattributes` : mêmes règles d'indentation et fins de ligne LF pour tous les éditeurs.
+
 ### Architecture du collecteur
 
 Package `fr.byj6n.conso`, découpé par composant plutôt que par couche technique (c'est un batch :

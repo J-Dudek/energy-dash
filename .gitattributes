@@ -1,0 +1,7 @@
+# Fins de ligne normalisées en LF (le build Docker et les scripts shell en dépendent).
+* text=auto eol=lf
+
+*.png binary
+*.ico binary
+*.jar binary
+*.woff2 binary
