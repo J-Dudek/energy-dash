@@ -15,6 +15,9 @@ import { createCredential, getCredential, passkeysSupported } from './passkey';
 import { currentSubscription, deviceLabel, subscriptionId } from './push';
 import type { AppConfig, InvoiceRow, PushDevice, ReadingRow, TariffRow } from './models';
 
+/** Mémorise que le navigateur refuse le cookie de session (cookie tiers bloqué) : voir preferCookieSession. */
+const COOKIE_MODE_KEY = 'conso.cookieMode';
+
 /**
  * Accès Appwrite côté navigateur. La config (endpoint, projet...) est lue au démarrage
  * dans /config.json, générée par le conteneur à partir de ses variables d'environnement.
@@ -192,7 +195,7 @@ export class AppwriteService {
    */
   private async openSession(): Promise<void> {
     const user = await this.account.get();
-    await this.preferCookieSession();
+    await this.preferCookieSession(true);
     this.user.set(user);
   }
 
@@ -236,9 +239,13 @@ export class AppwriteService {
    * faille XSS) si le cookie HttpOnly suffit à rester connecté. Sinon (cookies bloqués, domaines sans lien),
    * on la remet : mieux vaut une session fonctionnelle qu'une application inutilisable.
    */
-  private async preferCookieSession(): Promise<void> {
+  private async preferCookieSession(retest = false): Promise<void> {
     let copy: string | null;
     try {
+      if (retest) localStorage.removeItem(COOKIE_MODE_KEY);
+      // Déjà constaté que ce navigateur refuse le cookie : inutile de le retester (et de provoquer un 401 dans la
+      // console) à chaque rechargement. Le test est refait à la prochaine connexion.
+      if (localStorage.getItem(COOKIE_MODE_KEY) === 'fallback') return;
       copy = localStorage.getItem('cookieFallback');
       if (copy === null) return;
       localStorage.removeItem('cookieFallback');
@@ -250,6 +257,7 @@ export class AppwriteService {
     } catch {
       try {
         localStorage.setItem('cookieFallback', copy);
+        localStorage.setItem(COOKIE_MODE_KEY, 'fallback');
       } catch {
         // rien de plus à faire
       }
@@ -259,6 +267,7 @@ export class AppwriteService {
   private dropLocalCopy(): void {
     try {
       localStorage.removeItem('cookieFallback');
+      localStorage.removeItem(COOKIE_MODE_KEY);
     } catch {
       // stockage indisponible
     }
@@ -304,7 +313,7 @@ export class AppwriteService {
 
   private async listAll<T>(tableId: string, queries: string[]): Promise<T[]> {
     const out: T[] = [];
-    const page = 100;
+    const page = 1000; // l'instance accepte jusqu'à 5000 : 1 000 relevés = 2 requêtes au lieu de 11
     for (let offset = 0; ; offset += page) {
       const res = await this.tables.listRows({
         databaseId: this.config.databaseId,
