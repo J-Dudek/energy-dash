@@ -3,7 +3,9 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const envPath = fileURLToPath(new URL('../../.env', import.meta.url));
+// CONSO_ENV_FILE choisit le fichier (défaut .env = instance de test ; la prod est dans .env.prod).
+const envName = process.env.CONSO_ENV_FILE || '.env';
+const envPath = fileURLToPath(new URL(`../../${envName}`, import.meta.url));
 const outPath = fileURLToPath(new URL('../public/config.json', import.meta.url));
 
 if (!existsSync(envPath)) {

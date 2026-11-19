@@ -4,7 +4,7 @@ services:
     image: conso-collector:latest
     container_name: conso-collector
     restart: unless-stopped
-    env_file: .env
+    env_file: ${CONSO_ENV_FILE:-.env}
     environment:
       TZ: Europe/Paris
     volumes:

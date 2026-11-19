@@ -5,8 +5,10 @@ spring:
     import:
       # Dev local : charge le .env de la racine du repo (working dir = racine ou collector/).
       # "optional" : absent dans Docker, où docker-compose injecte déjà les variables (env_file).
-      - optional:file:.env[.properties]
-      - optional:file:../.env
+      # CONSO_ENV_FILE choisit le fichier (défaut .env, qui doit pointer sur l'instance de TEST ;
+      # la prod est dans .env.prod : CONSO_ENV_FILE=.env.prod).
+      - optional:file:${CONSO_ENV_FILE:.env}[.properties]
+      - optional:file:../${CONSO_ENV_FILE:.env}[.properties]
   main:
     web-application-type: none
     keep-alive: true   # pas de serveur web : on garde la JVM en vie pour le planificateur
