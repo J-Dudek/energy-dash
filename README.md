@@ -89,6 +89,10 @@ la dernière année glissante, mais les mois déjà collectés restent en base.
    # (facultatif) activer Netatmo : voir la section ci-dessus
    chmod 600 .env
    ```
+   **Deux environnements.** `.env` (défaut de tout : collecteur, dashboard, compose) doit pointer sur ton
+   projet Appwrite **de test**. La prod vit dans `.env.prod`, qu'il faut choisir explicitement :
+   `CONSO_ENV_FILE=.env.prod docker compose --env-file .env.prod up -d --build` (dev : `CONSO_ENV_FILE=.env.prod
+   mvn spring-boot:run`, `CONSO_ENV_FILE=.env.prod npm start`). `.env.*` est ignoré par git.
 
 3. **Lancement sur le NAS**
    ```bash
@@ -234,13 +238,15 @@ remplacent pas ces réglages (un minuteur côté navigateur n'est pas une fronti
   partagée. Le volume `collector-data` contient le jeton Netatmo.
 - Gaz de Bordeaux et Iléo n'ont pas d'API officielle : les identifiants sont ceux de ton compte client, donne-leur
   un mot de passe unique.
-- Le dashboard n'a pas de double authentification. Appwrite sait faire du TOTP, mais l'écran de connexion ne le
-  gère pas encore (voir Pistes).
+- Le dashboard gère les **passkeys** (WebAuthn) : bouton « Se connecter avec une passkey » et gestion dans le
+  page Profil (icône ronde en haut à droite, qui permet aussi de changer l'adresse e-mail). Il faut les activer dans la console Appwrite (Auth > Settings > Passkey) avec
+  le domaine de confiance (ex. `byj6n.fr`), **non modifiable** dès qu'une passkey existe. Le mot de passe reste
+  utilisable ; il n'y a pas encore de TOTP sur l'écran de connexion.
 - Les styles sont autorisés en ligne (`style-src 'unsafe-inline'`), car Angular en injecte ; les scripts, eux, ne le sont pas.
 
 ## Pistes
 
 - Suivi journalier de l'électricité (Linky) ou du gaz (Gazpar) : non vérifié, l'accès des
   particuliers aux API Enedis et GRDF est à confirmer.
-- Double authentification (TOTP Appwrite) sur l'écran de connexion.
+- TOTP Appwrite sur l'écran de connexion (les passkeys sont déjà gérées).
 - Alerte (mail via ton infra j6n.fr) quand une facture est disponible ou qu'un mois dépasse N-1.
