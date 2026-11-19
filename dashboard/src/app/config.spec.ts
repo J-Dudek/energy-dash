@@ -63,4 +63,19 @@ describe('validateConfig', () => {
     );
     expect(validateConfig({ ...base, idleMinutes: '15' }).idleMinutes).toBe(15);
   });
+
+  it('accepte une clé VAPID bien formée et ignore une clé absente ou vide', () => {
+    const key =
+      'BP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A8';
+    expect(validateConfig({ ...base, vapidPublicKey: key }).vapidPublicKey).toBe(key);
+    expect(validateConfig(base).vapidPublicKey).toBeUndefined();
+    expect(validateConfig({ ...base, vapidPublicKey: '' }).vapidPublicKey).toBeUndefined();
+  });
+
+  it('refuse une clé VAPID mal formée', () => {
+    expect(() => validateConfig({ ...base, vapidPublicKey: 'trop-courte' })).toThrow(
+      /vapidPublicKey/,
+    );
+    expect(() => validateConfig({ ...base, vapidPublicKey: 42 })).toThrow(/vapidPublicKey/);
+  });
 });

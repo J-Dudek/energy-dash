@@ -1,0 +1,11 @@
+# Configuration de gitleaks (CI et pre-commit) : règles par défaut + une exception ciblée.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Valeurs publiques des vecteurs de test"
+regexes = [
+  # RFC 8291 (Web Push), annexe A : « Authentication secret » de l'exemple publié. Utilisé par les tests du
+  # chiffrement pour vérifier qu'on retrouve exactement le message du RFC. Aucun lien avec un secret réel.
+  '''BTBZMqHH6r4Tts7J_aSIgg''',
+]

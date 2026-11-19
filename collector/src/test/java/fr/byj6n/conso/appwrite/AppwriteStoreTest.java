@@ -28,6 +28,7 @@ class AppwriteStoreTest {
     private final List<Call> calls = new CopyOnWriteArrayList<>();
     private final ObjectMapper mapper = new ObjectMapper();
     private volatile int fileGetStatus = 404;
+    private volatile int rowGetStatus = 404; // la facture n'existe pas encore
     private AppwriteStore store;
 
     @BeforeEach
@@ -47,10 +48,11 @@ class AppwriteStoreTest {
                                     path,
                                     ex.getRequestHeaders().getFirst("X-Appwrite-Key"),
                                     body));
-                    int status =
-                            ex.getRequestMethod().equals("GET") && path.contains("/files/")
-                                    ? fileGetStatus
-                                    : 200;
+                    int status = 200;
+                    if (ex.getRequestMethod().equals("GET")) {
+                        if (path.contains("/files/")) status = fileGetStatus;
+                        else if (path.contains("/rows/")) status = rowGetStatus;
+                    }
                     byte[] out = "{}".getBytes(StandardCharsets.UTF_8);
                     ex.sendResponseHeaders(status, out.length);
                     ex.getResponseBody().write(out);
@@ -113,7 +115,7 @@ class AppwriteStoreTest {
                         "DOC",
                         null);
 
-        boolean uploaded =
+        var written =
                 store.upsert(
                         inv,
                         () -> {
@@ -121,20 +123,22 @@ class AppwriteStoreTest {
                             return "%PDF-1.7 fake".getBytes(StandardCharsets.UTF_8);
                         });
 
-        assertThat(uploaded).isTrue();
+        assertThat(written.pdfUploaded()).isTrue();
+        assertThat(written.created()).isTrue();
         assertThat(downloads).hasValue(1);
-        assertThat(calls).extracting(Call::method).containsExactly("GET", "POST", "PUT");
-        Call upload = calls.get(1);
+        assertThat(calls).extracting(Call::method).containsExactly("GET", "GET", "POST", "PUT");
+        Call upload = calls.get(2);
         assertThat(upload.path()).isEqualTo("/v1/storage/buckets/invoices/files");
         assertThat(upload.body())
                 .contains("name=\"fileId\"\r\n\r\nileo-1000000003\r\n", "%PDF-1.7 fake");
-        assertThat(mapper.readTree(calls.get(2).body()).path("data").path("fileId").asText())
+        assertThat(mapper.readTree(calls.get(3).body()).path("data").path("fileId").asText())
                 .isEqualTo("ileo-1000000003");
     }
 
     @Test
     void factureDejaPresenteNeRetelechargePas() throws Exception {
         fileGetStatus = 200;
+        rowGetStatus = 200;
         AtomicInteger downloads = new AtomicInteger();
         Invoice inv =
                 new Invoice(
@@ -148,7 +152,7 @@ class AppwriteStoreTest {
                         "x",
                         1L);
 
-        boolean uploaded =
+        var written =
                 store.upsert(
                         inv,
                         () -> {
@@ -156,8 +160,9 @@ class AppwriteStoreTest {
                             return new byte[0];
                         });
 
-        assertThat(uploaded).isFalse();
+        assertThat(written.pdfUploaded()).isFalse();
+        assertThat(written.created()).isFalse();
         assertThat(downloads).hasValue(0);
-        assertThat(calls).extracting(Call::method).containsExactly("GET", "PUT");
+        assertThat(calls).extracting(Call::method).containsExactly("GET", "GET", "PUT");
     }
 }

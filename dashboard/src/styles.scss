@@ -167,7 +167,6 @@ button {
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  flex-wrap: wrap;
   padding: 20px clamp(16px, 4vw, 40px);
   border-bottom: 1px solid var(--border);
 
@@ -175,9 +174,21 @@ button {
     margin: 4px 0 0;
   }
 
+  // Le profil reste tout à droite (la marge est celle de la barre), même quand le titre est long
   .actions {
     display: flex;
+    align-items: center;
     gap: 8px;
+    margin-left: auto;
+    flex: none;
+  }
+
+  .topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    flex: 1;
   }
 }
 

@@ -14,7 +14,9 @@ public record CollectorProperties(
         Account gdb,
         Account ileo,
         Netatmo netatmo,
-        Appwrite appwrite) {
+        Appwrite appwrite,
+        @DefaultValue Push push,
+        @DefaultValue Alerts alerts) {
 
     public record Account(@DefaultValue("false") boolean enabled, String email, String password) {
 
@@ -88,6 +90,37 @@ public record CollectorProperties(
                     + bucketId
                     + ", readRole="
                     + readRole
+                    + "]";
+        }
+    }
+
+    /**
+     * Alertes de consommation : notification quand un mois d'électricité ou de gaz dépasse le même
+     * mois de l'année précédente d'au moins {@code thresholdPct} pour cent. 0 désactive.
+     */
+    public record Alerts(@DefaultValue("25") int thresholdPct) {}
+
+    /**
+     * Notifications Web Push (VAPID). Désactivées tant que les deux clés ne sont pas renseignées.
+     * Clés générées avec {@code scripts/generate-vapid-keys.mjs}.
+     */
+    public record Push(String subject, String vapidPublicKey, String vapidPrivateKey) {
+
+        public boolean enabled() {
+            return vapidPublicKey != null
+                    && !vapidPublicKey.isBlank()
+                    && vapidPrivateKey != null
+                    && !vapidPrivateKey.isBlank();
+        }
+
+        @Override
+        public String toString() {
+            return "Push[enabled="
+                    + enabled()
+                    + ", subject="
+                    + subject
+                    + ", vapidPrivateKey="
+                    + redact(vapidPrivateKey)
                     + "]";
         }
     }

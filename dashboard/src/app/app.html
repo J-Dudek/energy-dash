@@ -1,10 +1,22 @@
+@if (update.available()) {
+  <div class="update-bar" role="status">
+    <span>Une nouvelle version est disponible.</span>
+    <button type="button" class="primary sm" (click)="update.reload()">Recharger</button>
+  </div>
+}
 @if (!ready()) {
-  <main class="center"><p class="muted">Chargement…</p></main>
+  <main class="center splash" role="status">
+    <img src="icons/logo.png" alt="" width="64" height="96" />
+    <p class="muted">Chargement…</p>
+  </main>
 } @else if (!aw.user()) {
   <main class="center">
     <form class="login card" (ngSubmit)="login()">
-      <h1>Conso maison</h1>
-      <p class="muted">Eau, gaz et électricité</p>
+      <div class="brand">
+        <img src="icons/logo.png" alt="" width="86" height="128" />
+        <h1>Conso maison</h1>
+        <p class="muted">Eau, gaz et électricité</p>
+      </div>
       <label
         >E-mail
         <input type="email" name="email" [(ngModel)]="email" autocomplete="username" required />

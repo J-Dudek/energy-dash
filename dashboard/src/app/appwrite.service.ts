@@ -1,9 +1,22 @@
 import { Injectable, computed, signal } from '@angular/core';
 import type { Models } from 'appwrite';
-import { Account, AppwriteException, Client, ID, Query, TablesDB } from 'appwrite';
+import {
+  Account,
+  AppwriteException,
+  Client,
+  ID,
+  Permission,
+  Query,
+  Role,
+  TablesDB,
+} from 'appwrite';
 import { validateConfig } from './config';
 import { createCredential, getCredential, passkeysSupported } from './passkey';
-import type { AppConfig, InvoiceRow, ReadingRow, TariffRow } from './models';
+import { currentSubscription, deviceLabel, subscriptionId } from './push';
+import type { AppConfig, InvoiceRow, PushDevice, ReadingRow, TariffRow } from './models';
+
+/** Mémorise que le navigateur refuse le cookie de session (cookie tiers bloqué) : voir preferCookieSession. */
+const COOKIE_MODE_KEY = 'conso.cookieMode';
 
 /**
  * Accès Appwrite côté navigateur. La config (endpoint, projet...) est lue au démarrage
@@ -39,6 +52,11 @@ export class AppwriteService {
     return this.config.idleMinutes * 60_000;
   }
 
+  /** Clé publique VAPID du serveur ; absente = notifications non configurées. */
+  get vapidPublicKey(): string | undefined {
+    return this.config.vapidPublicKey;
+  }
+
   async init(): Promise<void> {
     const response = await fetch('config.json', { cache: 'no-store' });
     if (!response.ok) throw new Error('config.json introuvable');
@@ -63,8 +81,7 @@ export class AppwriteService {
   async login(email: string, password: string): Promise<void> {
     this.notice.set(null);
     await this.account.createEmailPasswordSession({ email, password });
-    this.user.set(await this.account.get());
-    await this.preferCookieSession();
+    await this.openSession();
     this.passkeyOffer.set(passkeysSupported());
   }
 
@@ -78,13 +95,81 @@ export class AppwriteService {
       credential,
     });
     await this.account.createSession({ userId: token.userId, secret: token.secret });
-    this.user.set(await this.account.get());
-    await this.preferCookieSession();
+    await this.openSession();
   }
 
   /** Change l'adresse e-mail ; Appwrite exige le mot de passe actuel et remet la vérification de l'adresse à zéro. */
   async updateEmail(email: string, password: string): Promise<void> {
     this.user.set(await this.account.updateEmail({ email, password }));
+  }
+
+  /**
+   * Enregistre (ou rafraîchit) l'abonnement de cet appareil : le collecteur y lit où envoyer les notifications.
+   * La ligne n'est lisible que par son propriétaire.
+   */
+  async savePushSubscription(subscription: PushSubscription): Promise<void> {
+    const json = subscription.toJSON();
+    const p256dh = json.keys?.['p256dh'];
+    const auth = json.keys?.['auth'];
+    const user = this.user();
+    if (!user || !json.endpoint || !p256dh || !auth) throw new Error('Abonnement incomplet');
+    const me = Role.user(user.$id);
+    await this.tables.upsertRow({
+      databaseId: this.config.databaseId,
+      tableId: 'push_subscriptions',
+      rowId: await subscriptionId(json.endpoint),
+      data: { endpoint: json.endpoint, p256dh, auth, label: deviceLabel() },
+      permissions: [Permission.read(me), Permission.update(me), Permission.delete(me)],
+    });
+  }
+
+  async deletePushSubscription(endpoint: string): Promise<void> {
+    try {
+      await this.tables.deleteRow({
+        databaseId: this.config.databaseId,
+        tableId: 'push_subscriptions',
+        rowId: await subscriptionId(endpoint),
+      });
+    } catch (e) {
+      if (!(e instanceof AppwriteException && e.code === 404)) throw e;
+    }
+  }
+
+  /** Les appareils de l'utilisateur abonnés aux notifications (les lignes des autres lui sont invisibles). */
+  async pushDevices(): Promise<PushDevice[]> {
+    const res = await this.tables.listRows({
+      databaseId: this.config.databaseId,
+      tableId: 'push_subscriptions',
+      queries: [Query.orderDesc('$updatedAt'), Query.limit(50)],
+    });
+    return res.rows.map((r) => {
+      const row = r as unknown as { $id: string; $updatedAt: string; label?: string | null };
+      return { id: row.$id, label: row.label ?? 'Appareil', lastSeen: row.$updatedAt };
+    });
+  }
+
+  async deletePushDevice(id: string): Promise<void> {
+    await this.tables.deleteRow({
+      databaseId: this.config.databaseId,
+      tableId: 'push_subscriptions',
+      rowId: id,
+    });
+  }
+
+  /** Après connexion : si cet appareil est déjà abonné, on remet sa ligne à jour (clés renouvelées, ligne purgée). */
+  async syncPushSubscription(): Promise<void> {
+    if (
+      !this.vapidPublicKey ||
+      !('Notification' in window) ||
+      Notification.permission !== 'granted'
+    )
+      return;
+    try {
+      const subscription = await currentSubscription();
+      if (subscription) await this.savePushSubscription(subscription);
+    } catch {
+      // pas bloquant : l'utilisateur peut réactiver depuis la page Profil
+    }
   }
 
   async passkeys(): Promise<Models.Passkey[]> {
@@ -100,6 +185,18 @@ export class AppwriteService {
 
   async deletePasskey(passkeyId: string): Promise<void> {
     await this.account.deletePasskey({ passkeyId });
+  }
+
+  /**
+   * Fin d'une connexion : on règle d'abord la question du cookie *puis* on annonce l'utilisateur. Dès que `user`
+   * est posé, le tableau de bord s'affiche et charge ses données : si la copie de secours de la session était
+   * retirée à ce moment-là (cookie tiers bloqué, Chrome), ces requêtes partiraient sans session et on serait
+   * déconnecté aussitôt (« Session expirée »).
+   */
+  private async openSession(): Promise<void> {
+    const user = await this.account.get();
+    await this.preferCookieSession(true);
+    this.user.set(user);
   }
 
   async logout(): Promise<void> {
@@ -142,9 +239,13 @@ export class AppwriteService {
    * faille XSS) si le cookie HttpOnly suffit à rester connecté. Sinon (cookies bloqués, domaines sans lien),
    * on la remet : mieux vaut une session fonctionnelle qu'une application inutilisable.
    */
-  private async preferCookieSession(): Promise<void> {
+  private async preferCookieSession(retest = false): Promise<void> {
     let copy: string | null;
     try {
+      if (retest) localStorage.removeItem(COOKIE_MODE_KEY);
+      // Déjà constaté que ce navigateur refuse le cookie : inutile de le retester (et de provoquer un 401 dans la
+      // console) à chaque rechargement. Le test est refait à la prochaine connexion.
+      if (localStorage.getItem(COOKIE_MODE_KEY) === 'fallback') return;
       copy = localStorage.getItem('cookieFallback');
       if (copy === null) return;
       localStorage.removeItem('cookieFallback');
@@ -156,6 +257,7 @@ export class AppwriteService {
     } catch {
       try {
         localStorage.setItem('cookieFallback', copy);
+        localStorage.setItem(COOKIE_MODE_KEY, 'fallback');
       } catch {
         // rien de plus à faire
       }
@@ -165,6 +267,7 @@ export class AppwriteService {
   private dropLocalCopy(): void {
     try {
       localStorage.removeItem('cookieFallback');
+      localStorage.removeItem(COOKIE_MODE_KEY);
     } catch {
       // stockage indisponible
     }
@@ -210,7 +313,7 @@ export class AppwriteService {
 
   private async listAll<T>(tableId: string, queries: string[]): Promise<T[]> {
     const out: T[] = [];
-    const page = 100;
+    const page = 1000; // l'instance accepte jusqu'à 5000 : 1 000 relevés = 2 requêtes au lieu de 11
     for (let offset = 0; ; offset += page) {
       const res = await this.tables.listRows({
         databaseId: this.config.databaseId,

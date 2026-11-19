@@ -22,6 +22,7 @@ export class DashboardStore {
   readonly invoiceProvider = signal<string>('all');
 
   private loaded = false;
+  private loadedAt = 0;
 
   constructor() {
     // Plus d'utilisateur (déconnexion, expiration) : plus aucune donnée personnelle en mémoire.
@@ -53,11 +54,21 @@ export class DashboardStore {
       this.readings.set(r);
       this.invoices.set(i);
       this.loaded = true;
+      this.loadedAt = Date.now();
     } catch (e) {
       await this.fail(e);
     } finally {
       this.loading.set(false);
     }
+  }
+
+  /**
+   * Relit les données si elles datent : une application installée reste ouverte des jours, et il n'y a plus de
+   * bouton pour actualiser. À appeler quand l'utilisateur revient sur l'application.
+   */
+  async refreshIfStale(maxAgeMs = 10 * 60_000): Promise<void> {
+    if (!this.loaded || this.loading() || Date.now() - this.loadedAt < maxAgeMs) return;
+    await this.load(true);
   }
 
   /** Session refusée par le serveur : retour à l'écran de connexion. Toute autre erreur : message à l'écran. */

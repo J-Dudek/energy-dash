@@ -35,6 +35,14 @@ conso:
     lookback-days: ${CONSO_NETATMO_LOOKBACK_DAYS:1000}
     device-id: ${CONSO_NETATMO_DEVICE_ID:}
     module-id: ${CONSO_NETATMO_MODULE_ID:}
+  alerts:
+    # Alerte si un mois dépasse le même mois de l'an dernier d'au moins N % (0 = pas d'alerte)
+    threshold-pct: ${CONSO_ALERT_THRESHOLD_PCT:25}
+  push:
+    # Notifications (nouvelle facture) : voir "Notifications" dans le README. Vide = désactivées.
+    subject: ${CONSO_PUSH_SUBJECT:}
+    vapid-public-key: ${CONSO_VAPID_PUBLIC_KEY:}
+    vapid-private-key: ${CONSO_VAPID_PRIVATE_KEY:}
   appwrite:
     endpoint: ${CONSO_APPWRITE_ENDPOINT}
     project-id: ${CONSO_APPWRITE_PROJECT_ID}

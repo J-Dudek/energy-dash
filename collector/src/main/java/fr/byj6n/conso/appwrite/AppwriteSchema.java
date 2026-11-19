@@ -17,6 +17,7 @@ public class AppwriteSchema {
     public static final String READINGS = "readings";
     public static final String INVOICES = "invoices";
     public static final String TARIFFS = "tariffs";
+    public static final String PUSH_SUBSCRIPTIONS = "push_subscriptions";
 
     private static final Logger log = LoggerFactory.getLogger(AppwriteSchema.class);
 
@@ -72,6 +73,13 @@ public class AppwriteSchema {
                         Column.num("hp", false),
                         Column.num("hc", false),
                         Column.num("subscriptionMonthly", false)));
+        TABLES.put(
+                PUSH_SUBSCRIPTIONS,
+                List.of(
+                        Column.str("endpoint", 1024, true),
+                        Column.str("p256dh", 128, true),
+                        Column.str("auth", 64, true),
+                        Column.str("label", 80, false)));
     }
 
     private final AppwriteRest api;
@@ -92,8 +100,19 @@ public class AppwriteSchema {
 
         for (var table : TABLES.entrySet()) {
             String t = table.getKey();
+            // Abonnements : les appareils les créent eux-mêmes, et chaque ligne n'est lisible que
+            // par son
+            // propriétaire (permissions posées par le dashboard). Les autres tables : lecture
+            // seule.
+            boolean userOwned = t.equals(PUSH_SUBSCRIPTIONS);
             Map<String, Object> tableCfg =
-                    Map.of("name", t, "permissions", List.of(readPerm), "rowSecurity", false);
+                    Map.of(
+                            "name",
+                            t,
+                            "permissions",
+                            List.of(userOwned ? "create(\"" + cfg.readRole() + "\")" : readPerm),
+                            "rowSecurity",
+                            userOwned);
             createOrUpdate(
                     "/tablesdb/" + db + "/tables",
                     withId("tableId", t, tableCfg),

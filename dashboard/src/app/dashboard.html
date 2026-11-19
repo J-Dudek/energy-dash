@@ -1,22 +1,51 @@
 <header class="topbar">
-  <div>
-    <h1>Conso maison</h1>
-    @if (lastSync(); as sync) {
-      <p class="muted small">
-        Dernière collecte : {{ sync | date: 'd MMM y à HH:mm' : undefined : 'fr' }}
-      </p>
-    }
+  <div class="topbar-left">
+    <app-brand-link />
+    <div>
+      <h1>Conso maison</h1>
+      @if (lastSync(); as sync) {
+        <p class="muted small">
+          Dernière collecte : {{ sync | date: 'd MMM y à HH:mm' : undefined : 'fr' }}
+        </p>
+      }
+    </div>
   </div>
   <div class="actions">
-    <button class="ghost" (click)="load()" [disabled]="loading()">
-      {{ loading() ? 'Actualisation…' : 'Actualiser' }}
-    </button>
     <a routerLink="/profil" class="avatar" aria-label="Profil">{{ aw.initial() }}</a>
   </div>
 </header>
+@if (loading()) {
+  <div class="progress" aria-hidden="true"></div>
+}
 
 <main class="content">
-  @if (aw.passkeyOffer()) {
+  @if (install.visible()) {
+    <section class="card offer" role="region" aria-label="Installer l'application">
+      <div>
+        <strong>Installer Conso maison sur cet appareil ?</strong>
+        @if (install.mode() === 'ios') {
+          <p class="muted small">
+            Touche <strong>Partager</strong> dans la barre de Safari, puis
+            <strong>Sur l'écran d'accueil</strong>. L'application s'ouvre alors en plein écran, et
+            c'est la condition pour recevoir les notifications sur iPhone.
+          </p>
+        } @else {
+          <p class="muted small">
+            Une icône sur l'écran d'accueil, l'application en plein écran, et les notifications de
+            nouvelles factures.
+          </p>
+        }
+      </div>
+      <div class="offer-actions">
+        @if (install.mode() === 'prompt') {
+          <button class="primary sm" (click)="install.install()">Installer</button>
+        }
+        <button class="ghost sm" (click)="install.dismiss()">
+          {{ install.mode() === 'ios' ? 'Compris' : 'Plus tard' }}
+        </button>
+      </div>
+    </section>
+  } @else if (aw.passkeyOffer()) {
     <section class="card offer" role="region" aria-label="Proposition de passkey">
       <div>
         <strong>Te connecter sans mot de passe ?</strong>
@@ -42,281 +71,316 @@
     <p class="error banner" role="alert">{{ error() }}</p>
   }
 
-  <section class="kpis">
-    @for (k of kpis(); track k.energy) {
-      <article class="card kpi" [class.active]="selected() === k.energy">
-        <button
-          class="kpi-select"
-          (click)="selected.set(k.energy)"
-          [attr.aria-pressed]="selected() === k.energy"
-        >
-          <span class="kpi-head">
-            <span class="dot" [attr.data-energy]="k.energy"></span>
-            {{ ENERGY_LABEL[k.energy] }}
-          </span>
-          @if (k.latest; as l) {
-            <span class="hero"
-              >{{ l.value | number: '1.0-0' : 'fr' }} <small>{{ k.unit }}</small></span
-            >
-            <span class="muted small">{{
-              k.energy === 'water' ? 'moyenne de la dernière facture' : l.label
-            }}</span>
-            @if (k.deltaPct !== null) {
-              <span class="delta" [class.up]="k.deltaPct > 0" [class.down]="k.deltaPct < 0">
-                <span aria-hidden="true">{{
-                  k.deltaPct > 0 ? '▲' : k.deltaPct < 0 ? '▼' : '='
-                }}</span>
-                {{ k.deltaPct > 0 ? '+' : '' }}{{ k.deltaPct }} % vs N-1
-              </span>
-            }
-            @if (k.unitPrice !== null) {
-              <span class="small"
-                >{{ k.unitPrice | number: (k.energy === 'water' ? '1.2-2' : '1.3-3') : 'fr' }}
-                {{ k.unitPriceUnit }} <span class="muted">· {{ k.unitPriceHint }}</span></span
-              >
-            }
-            @if (k.totalLast12 !== null) {
-              <span class="muted small"
-                >12 derniers mois : {{ k.totalLast12 | number: '1.0-0' : 'fr' }}
-                {{ k.energy === 'water' ? 'm³' : 'kWh' }}</span
-              >
-            }
-          } @else {
-            <span class="muted">Pas encore de données</span>
-          }
-        </button>
-        <footer class="invoice">
-          @if (k.lastInvoice; as inv) {
-            <div>
-              <span class="small">Dernière facture · {{ PROVIDER_LABEL[inv.provider] }}</span>
-              <span class="small muted">
-                {{ inv.date | date: 'dd/MM/yyyy' }}
-                @if (inv.amount !== null) {
-                  · {{ inv.amount | number: '1.2-2' : 'fr' }} €
-                }
-              </span>
+  @if (skeleton()) {
+    <div class="sk-wrap" role="status" aria-live="polite">
+      <span class="sr-only">Chargement des données…</span>
+      <section class="kpis" aria-hidden="true">
+        @for (i of [1, 2, 3]; track i) {
+          <article class="card kpi sk-card">
+            <div class="sk-body">
+              <span class="sk sk-line" style="width: 38%"></span>
+              <span class="sk sk-hero"></span>
+              <span class="sk sk-line" style="width: 62%"></span>
+              <span class="sk sk-line" style="width: 48%"></span>
             </div>
-            <button
-              class="primary sm"
-              (click)="download(inv)"
-              [disabled]="downloading() === inv.$id"
-            >
-              {{ downloading() === inv.$id ? '…' : 'PDF' }}
-            </button>
-          } @else {
-            <span class="small muted">Aucune facture</span>
-          }
-        </footer>
-      </article>
-    }
-  </section>
-
-  <section class="card">
-    <div class="section-head">
-      <div>
-        <h2>{{ ENERGY_LABEL[selected()] }}</h2>
-        <p class="muted small">
-          @switch (selected()) {
-            @case ('electricity') {
-              Consommation mensuelle (kWh)
-            }
-            @case ('gas') {
-              Consommation mensuelle (kWh){{
-                hasHeating() ? ' et temps de chauffe de la chaudière (h)' : ''
-              }}
-            }
-            @case ('water') {
-              Consommation moyenne par jour, par période de facturation (litres)
-            }
-          }
-        </p>
-      </div>
-      <div class="segmented" role="tablist">
-        @for (e of energies; track e) {
-          <button
-            role="tab"
-            [attr.aria-selected]="selected() === e"
-            [class.on]="selected() === e"
-            (click)="selected.set(e)"
-          >
-            {{ ENERGY_LABEL[e] }}
-          </button>
+            <footer class="invoice"><span class="sk sk-line" style="width: 55%"></span></footer>
+          </article>
         }
-        <button class="ghost sm" (click)="showTable.set(!showTable())">
-          {{ showTable() ? 'Graphique' : 'Tableau' }}
-        </button>
-      </div>
-    </div>
-
-    @if (points().length === 0) {
-      <p class="muted empty">
-        Pas encore de relevés pour cette énergie. Le collecteur tourne tous les matins.
-      </p>
-    } @else if (showTable()) {
-      <div class="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>Période</th>
-              @if (selected() === 'electricity') {
-                <th class="num">HP (kWh)</th>
-                <th class="num">HC (kWh)</th>
-              }
-              <th class="num">{{ selected() === 'water' ? 'm³ facturés' : 'Total (kWh)' }}</th>
-              @if (selected() === 'water') {
-                <th class="num">L/jour</th>
-              } @else {
-                <th class="num hide-sm">T° moy.</th>
-              }
-              @if (hasHeating()) {
-                <th class="num">Chauffe (h)</th>
-                <th class="num">kWh / h</th>
-              }
-            </tr>
-          </thead>
-          <tbody>
-            @for (p of points(); track p.date.getTime()) {
-              <tr>
-                <td>{{ p.label }}</td>
-                @if (selected() === 'electricity') {
-                  <td class="num">{{ p.hp ?? '–' }}</td>
-                  <td class="num">{{ p.hc ?? '–' }}</td>
-                }
-                <td class="num">{{ p.raw | number: '1.0-1' : 'fr' }}</td>
-                @if (selected() === 'water') {
-                  <td class="num">{{ p.value | number: '1.0-0' : 'fr' }}</td>
-                } @else {
-                  <td class="num hide-sm">
-                    {{
-                      p.temperature !== null
-                        ? (p.temperature | number: '1.0-1' : 'fr') + ' °C'
-                        : '–'
-                    }}
-                  </td>
-                }
-                @if (hasHeating()) {
-                  <td class="num">
-                    {{ p.heatingHours !== null ? (p.heatingHours | number: '1.0-1' : 'fr') : '–' }}
-                    @if (p.heatingHours !== null && p.heatingDays < p.monthDays) {
-                      <span
-                        class="muted small"
-                        [title]="p.heatingDays + ' jours sur ' + p.monthDays"
-                        >(partiel)</span
-                      >
-                    }
-                  </td>
-                  <td class="num">
-                    {{
-                      p.kwhPerHeatingHour !== null
-                        ? (p.kwhPerHeatingHour | number: '1.0-1' : 'fr')
-                        : '–'
-                    }}
-                  </td>
-                }
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-    } @else {
-      <app-energy-chart
-        [energy]="selected()"
-        [points]="points()"
-        [ariaLabel]="'Consommation ' + ENERGY_LABEL[selected()]"
-      />
-    }
-  </section>
-
-  <section class="card">
-    <div class="section-head">
-      <h2>Factures</h2>
-      @if (invoiceProviders().length > 1) {
-        <div class="segmented" role="tablist" aria-label="Filtrer par fournisseur">
-          <button
-            role="tab"
-            [attr.aria-selected]="invoiceProvider() === 'all'"
-            [class.on]="invoiceProvider() === 'all'"
-            (click)="invoiceProvider.set('all')"
-          >
-            Toutes
-          </button>
-          @for (p of invoiceProviders(); track p) {
-            <button
-              role="tab"
-              [attr.aria-selected]="invoiceProvider() === p"
-              [class.on]="invoiceProvider() === p"
-              (click)="invoiceProvider.set(p)"
-            >
-              {{ PROVIDER_LABEL[p] ?? p }}
-            </button>
+      </section>
+      <section class="card" aria-hidden="true">
+        <span class="sk sk-line" style="width: 120px; height: 20px"></span>
+        <div class="sk-chart">
+          @for (h of [38, 52, 44, 70, 58, 82, 64, 90, 72, 60, 48, 66]; track $index) {
+            <span class="sk sk-bar" [style.height.%]="h"></span>
           }
         </div>
-      }
+      </section>
+      <section class="card" aria-hidden="true">
+        <span class="sk sk-line" style="width: 90px; height: 20px"></span>
+        @for (r of [1, 2, 3, 4]; track r) {
+          <span class="sk sk-row"></span>
+        }
+      </section>
     </div>
-    @if (invoices().length === 0) {
-      <p class="muted empty">Aucune facture collectée pour l'instant.</p>
-    } @else {
-      <div class="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th class="hide-sm">Fournisseur</th>
-              <th>Énergie</th>
-              <th class="hide-sm">N°</th>
-              <th class="num">Montant</th>
-              <th class="num hide-sm">Reste dû</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (inv of filteredInvoices(); track inv.$id) {
-              <tr>
-                <td>{{ inv.date | date: 'dd/MM/yyyy' }}</td>
-                <td class="hide-sm">{{ PROVIDER_LABEL[inv.provider] }}</td>
-                <td>
-                  <span class="dot" [attr.data-energy]="inv.energy"></span
-                  >{{ ENERGY_LABEL[inv.energy] }}
-                </td>
-                <td class="muted hide-sm">{{ inv.number }}</td>
-                <td class="num">
-                  {{ inv.amount !== null ? (inv.amount | number: '1.2-2' : 'fr') + ' €' : '–' }}
-                </td>
-                <td class="num hide-sm">
-                  {{
-                    inv.amountDue !== null ? (inv.amountDue | number: '1.2-2' : 'fr') + ' €' : '–'
-                  }}
-                </td>
-                <td class="num">
-                  @if (inv.fileId) {
-                    <button
-                      class="link"
-                      (click)="download(inv)"
-                      [disabled]="downloading() === inv.$id"
-                    >
-                      {{ downloading() === inv.$id ? 'Téléchargement…' : 'Télécharger' }}
-                    </button>
-                  }
-                </td>
-              </tr>
+  } @else {
+    <section class="kpis">
+      @for (k of kpis(); track k.energy) {
+        <article class="card kpi" [class.active]="selected() === k.energy">
+          <button
+            class="kpi-select"
+            (click)="selected.set(k.energy)"
+            [attr.aria-pressed]="selected() === k.energy"
+          >
+            <span class="kpi-head">
+              <span class="dot" [attr.data-energy]="k.energy"></span>
+              {{ ENERGY_LABEL[k.energy] }}
+            </span>
+            @if (k.latest; as l) {
+              <span class="hero"
+                >{{ l.value | number: '1.0-0' : 'fr' }} <small>{{ k.unit }}</small></span
+              >
+              <span class="muted small">{{
+                k.energy === 'water' ? 'moyenne de la dernière facture' : l.label
+              }}</span>
+              @if (k.deltaPct !== null) {
+                <span class="delta" [class.up]="k.deltaPct > 0" [class.down]="k.deltaPct < 0">
+                  <span aria-hidden="true">{{
+                    k.deltaPct > 0 ? '▲' : k.deltaPct < 0 ? '▼' : '='
+                  }}</span>
+                  {{ k.deltaPct > 0 ? '+' : '' }}{{ k.deltaPct }} % vs N-1
+                </span>
+              }
+              @if (k.unitPrice !== null) {
+                <span class="small"
+                  >{{ k.unitPrice | number: (k.energy === 'water' ? '1.2-2' : '1.3-3') : 'fr' }}
+                  {{ k.unitPriceUnit }} <span class="muted">· {{ k.unitPriceHint }}</span></span
+                >
+              }
+              @if (k.totalLast12 !== null) {
+                <span class="muted small"
+                  >12 derniers mois : {{ k.totalLast12 | number: '1.0-0' : 'fr' }}
+                  {{ k.energy === 'water' ? 'm³' : 'kWh' }}</span
+                >
+              }
+            } @else {
+              <span class="muted">Pas encore de données</span>
             }
-          </tbody>
-          <tfoot>
-            <tr class="total">
-              <td>Total</td>
-              <td class="hide-sm"></td>
-              <td class="muted">
-                {{ invoiceTotals().count }}
-                {{ invoiceTotals().count > 1 ? 'factures' : 'facture' }}
-              </td>
-              <td class="hide-sm"></td>
-              <td class="num">{{ invoiceTotals().amount | number: '1.2-2' : 'fr' }} €</td>
-              <td class="num hide-sm">{{ invoiceTotals().due | number: '1.2-2' : 'fr' }} €</td>
-              <td></td>
-            </tr>
-          </tfoot>
-        </table>
+          </button>
+          <footer class="invoice">
+            @if (k.lastInvoice; as inv) {
+              <div>
+                <span class="small">Dernière facture · {{ PROVIDER_LABEL[inv.provider] }}</span>
+                <span class="small muted">
+                  {{ inv.date | date: 'dd/MM/yyyy' }}
+                  @if (inv.amount !== null) {
+                    · {{ inv.amount | number: '1.2-2' : 'fr' }} €
+                  }
+                </span>
+              </div>
+              <button
+                class="primary sm"
+                (click)="download(inv)"
+                [disabled]="downloading() === inv.$id"
+              >
+                {{ downloading() === inv.$id ? '…' : 'PDF' }}
+              </button>
+            } @else {
+              <span class="small muted">Aucune facture</span>
+            }
+          </footer>
+        </article>
+      }
+    </section>
+
+    <section class="card" id="graphique">
+      <div class="section-head">
+        <div>
+          <h2>{{ ENERGY_LABEL[selected()] }}</h2>
+          <p class="muted small">
+            @switch (selected()) {
+              @case ('electricity') {
+                Consommation mensuelle (kWh)
+              }
+              @case ('gas') {
+                Consommation mensuelle (kWh){{
+                  hasHeating() ? ' et temps de chauffe de la chaudière (h)' : ''
+                }}
+              }
+              @case ('water') {
+                Consommation moyenne par jour, par période de facturation (litres)
+              }
+            }
+          </p>
+        </div>
+        <div class="segmented" role="tablist">
+          @for (e of energies; track e) {
+            <button
+              role="tab"
+              [attr.aria-selected]="selected() === e"
+              [class.on]="selected() === e"
+              (click)="selected.set(e)"
+            >
+              {{ ENERGY_LABEL[e] }}
+            </button>
+          }
+          <button class="ghost sm" (click)="showTable.set(!showTable())">
+            {{ showTable() ? 'Graphique' : 'Tableau' }}
+          </button>
+        </div>
       </div>
-    }
-  </section>
+
+      @if (points().length === 0) {
+        <p class="muted empty">
+          Pas encore de relevés pour cette énergie. Le collecteur tourne tous les matins.
+        </p>
+      } @else if (showTable()) {
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Période</th>
+                @if (selected() === 'electricity') {
+                  <th class="num">HP (kWh)</th>
+                  <th class="num">HC (kWh)</th>
+                }
+                <th class="num">{{ selected() === 'water' ? 'm³ facturés' : 'Total (kWh)' }}</th>
+                @if (selected() === 'water') {
+                  <th class="num">L/jour</th>
+                } @else {
+                  <th class="num hide-sm">T° moy.</th>
+                }
+                @if (hasHeating()) {
+                  <th class="num">Chauffe (h)</th>
+                  <th class="num">kWh / h</th>
+                }
+              </tr>
+            </thead>
+            <tbody>
+              @for (p of points(); track p.date.getTime()) {
+                <tr>
+                  <td>{{ p.label }}</td>
+                  @if (selected() === 'electricity') {
+                    <td class="num">{{ p.hp ?? '–' }}</td>
+                    <td class="num">{{ p.hc ?? '–' }}</td>
+                  }
+                  <td class="num">{{ p.raw | number: '1.0-1' : 'fr' }}</td>
+                  @if (selected() === 'water') {
+                    <td class="num">{{ p.value | number: '1.0-0' : 'fr' }}</td>
+                  } @else {
+                    <td class="num hide-sm">
+                      {{
+                        p.temperature !== null
+                          ? (p.temperature | number: '1.0-1' : 'fr') + ' °C'
+                          : '–'
+                      }}
+                    </td>
+                  }
+                  @if (hasHeating()) {
+                    <td class="num">
+                      {{
+                        p.heatingHours !== null ? (p.heatingHours | number: '1.0-1' : 'fr') : '–'
+                      }}
+                      @if (p.heatingHours !== null && p.heatingDays < p.monthDays) {
+                        <span
+                          class="muted small"
+                          [title]="p.heatingDays + ' jours sur ' + p.monthDays"
+                          >(partiel)</span
+                        >
+                      }
+                    </td>
+                    <td class="num">
+                      {{
+                        p.kwhPerHeatingHour !== null
+                          ? (p.kwhPerHeatingHour | number: '1.0-1' : 'fr')
+                          : '–'
+                      }}
+                    </td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <app-energy-chart
+          [energy]="selected()"
+          [points]="points()"
+          [ariaLabel]="'Consommation ' + ENERGY_LABEL[selected()]"
+        />
+      }
+    </section>
+
+    <section class="card" id="factures">
+      <div class="section-head">
+        <h2>Factures</h2>
+        @if (invoiceProviders().length > 1) {
+          <div class="segmented" role="tablist" aria-label="Filtrer par fournisseur">
+            <button
+              role="tab"
+              [attr.aria-selected]="invoiceProvider() === 'all'"
+              [class.on]="invoiceProvider() === 'all'"
+              (click)="invoiceProvider.set('all')"
+            >
+              Toutes
+            </button>
+            @for (p of invoiceProviders(); track p) {
+              <button
+                role="tab"
+                [attr.aria-selected]="invoiceProvider() === p"
+                [class.on]="invoiceProvider() === p"
+                (click)="invoiceProvider.set(p)"
+              >
+                {{ PROVIDER_LABEL[p] ?? p }}
+              </button>
+            }
+          </div>
+        }
+      </div>
+      @if (invoices().length === 0) {
+        <p class="muted empty">Aucune facture collectée pour l'instant.</p>
+      } @else {
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th class="hide-sm">Fournisseur</th>
+                <th>Énergie</th>
+                <th class="hide-sm">N°</th>
+                <th class="num">Montant</th>
+                <th class="num hide-sm">Reste dû</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (inv of filteredInvoices(); track inv.$id) {
+                <tr [class.flash]="highlight() === inv.$id" [id]="'facture-' + inv.$id">
+                  <td>{{ inv.date | date: 'dd/MM/yyyy' }}</td>
+                  <td class="hide-sm">{{ PROVIDER_LABEL[inv.provider] }}</td>
+                  <td>
+                    <span class="dot" [attr.data-energy]="inv.energy"></span
+                    >{{ ENERGY_LABEL[inv.energy] }}
+                  </td>
+                  <td class="muted hide-sm">{{ inv.number }}</td>
+                  <td class="num">
+                    {{ inv.amount !== null ? (inv.amount | number: '1.2-2' : 'fr') + ' €' : '–' }}
+                  </td>
+                  <td class="num hide-sm">
+                    {{
+                      inv.amountDue !== null ? (inv.amountDue | number: '1.2-2' : 'fr') + ' €' : '–'
+                    }}
+                  </td>
+                  <td class="num">
+                    @if (inv.fileId) {
+                      <button
+                        class="link"
+                        (click)="download(inv)"
+                        [disabled]="downloading() === inv.$id"
+                      >
+                        {{ downloading() === inv.$id ? 'Téléchargement…' : 'Télécharger' }}
+                      </button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+            <tfoot>
+              <tr class="total">
+                <td>Total</td>
+                <td class="hide-sm"></td>
+                <td class="muted">
+                  {{ invoiceTotals().count }}
+                  {{ invoiceTotals().count > 1 ? 'factures' : 'facture' }}
+                </td>
+                <td class="hide-sm"></td>
+                <td class="num">{{ invoiceTotals().amount | number: '1.2-2' : 'fr' }} €</td>
+                <td class="num hide-sm">{{ invoiceTotals().due | number: '1.2-2' : 'fr' }} €</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      }
+    </section>
+  }
 </main>

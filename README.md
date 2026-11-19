@@ -244,6 +244,12 @@ remplacent pas ces réglages (un minuteur côté navigateur n'est pas une fronti
   utilisable ; il n'y a pas encore de TOTP sur l'écran de connexion.
 - Les styles sont autorisés en ligne (`style-src 'unsafe-inline'`), car Angular en injecte ; les scripts, eux, ne le sont pas.
 
+## Application installable et notifications
+
+Le dashboard est une PWA (icône sur l'écran d'accueil Android et iPhone) et notifie l'arrivée d'une nouvelle
+facture par Web Push. Guide : [docs/notifications.md](docs/notifications.md) (génération des clés VAPID,
+installation sur iPhone, dépannage).
+
 ## Déploiement sur un NAS Synology
 
 Guide pas à pas (Container Manager, reverse proxy HTTPS, durcissement DSM, sauvegardes) :

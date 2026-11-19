@@ -42,6 +42,7 @@ services:
       APPWRITE_BUCKET_ID: ${CONSO_APPWRITE_BUCKET_ID:-invoices}
       SESSION_IDLE_MINUTES: ${CONSO_SESSION_IDLE_MINUTES:-30}
       SESSION_MAX_HOURS: ${CONSO_SESSION_MAX_HOURS:-12}
+      VAPID_PUBLIC_KEY: ${CONSO_VAPID_PUBLIC_KEY:-}
     # Écoute en local uniquement : l'accès passe par le reverse proxy HTTPS du NAS (voir le guide).
     # Pour tester depuis le réseau local : CONSO_DASHBOARD_BIND=0.0.0.0
     ports:
