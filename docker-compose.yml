@@ -1,3 +1,4 @@
+# Déploiement : voir docs/deploiement-synology.md. Avant le premier `up` : sh scripts/preflight.sh
 services:
   collector:
     build: ./collector
@@ -9,9 +10,12 @@ services:
       TZ: Europe/Paris
     volumes:
       - collector-data:/app/data   # jeton Netatmo (il tourne à chaque collecte)
-    # Durcissement : aucune capability Linux, système de fichiers en lecture seule (seuls /tmp et le volume
-    # ci-dessus sont inscriptibles). On pourra ajouter `security_opt: [no-new-privileges:true]` si l'hôte Docker
-    # le supporte : il empêche le démarrage des conteneurs sur certaines installations.
+    # Aucun port publié : le collecteur ne fait que des appels sortants (fournisseurs, Appwrite).
+    networks: [back]
+    # Durcissement : utilisateur 10001 (Dockerfile), aucune capability Linux, système de fichiers en lecture
+    # seule (seuls /tmp et le volume ci-dessus sont inscriptibles), ressources plafonnées.
+    # `security_opt: [no-new-privileges:true]` est conseillé si l'hôte Docker le supporte : il empêche le
+    # démarrage des conteneurs sur certaines installations, donc il reste à activer volontairement.
     cap_drop:
       - ALL
     read_only: true
@@ -19,6 +23,12 @@ services:
       - /tmp
     pids_limit: 200
     mem_limit: 384m
+    cpus: 1.0
+    logging: &logs
+      driver: json-file
+      options: # sans plafond, les journaux grossissent indéfiniment sur le disque du NAS
+        max-size: 5m
+        max-file: "3"
 
   dashboard:
     build: ./dashboard
@@ -32,25 +42,32 @@ services:
       APPWRITE_BUCKET_ID: ${CONSO_APPWRITE_BUCKET_ID:-invoices}
       SESSION_IDLE_MINUTES: ${CONSO_SESSION_IDLE_MINUTES:-30}
       SESSION_MAX_HOURS: ${CONSO_SESSION_MAX_HOURS:-12}
-    # Écoute en local uniquement : l'accès passe par le reverse proxy HTTPS du NAS (voir README).
+    # Écoute en local uniquement : l'accès passe par le reverse proxy HTTPS du NAS (voir le guide).
     # Pour tester depuis le réseau local : CONSO_DASHBOARD_BIND=0.0.0.0
     ports:
-      - "${CONSO_DASHBOARD_BIND:-127.0.0.1}:8095:80"
-    # (pas de no-new-privileges ici : l'entrypoint de l'image nginx ne démarre pas avec sur certains hôtes Docker)
+      - "${CONSO_DASHBOARD_BIND:-127.0.0.1}:8095:8080"
+    networks: [front]
+    # nginx « unprivileged » : utilisateur 101, port 8080, donc aucune capability à rendre (cap_add inutile).
     cap_drop:
       - ALL
-    cap_add: # le strict nécessaire à nginx : ouvrir le port 80 puis passer à l'utilisateur "nginx"
-      - NET_BIND_SERVICE
-      - CHOWN
-      - SETUID
-      - SETGID
     read_only: true
     tmpfs:
       - /tmp
-      - /run
-      - /var/cache/nginx
     pids_limit: 100
     mem_limit: 64m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/config.json"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging: *logs
+
+# Un réseau par service : le collecteur et le dashboard ne peuvent pas se parler.
+networks:
+  back:
+  front:
 
 volumes:
   collector-data:
