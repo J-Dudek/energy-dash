@@ -1,0 +1,46 @@
+spring:
+  application:
+    name: conso-collector
+  config:
+    import:
+      # Dev local : charge le .env de la racine du repo (working dir = racine ou collector/).
+      # "optional" : absent dans Docker, où docker-compose injecte déjà les variables (env_file).
+      - optional:file:.env[.properties]
+      - optional:file:../.env
+  main:
+    web-application-type: none
+    keep-alive: true   # pas de serveur web : on garde la JVM en vie pour le planificateur
+
+conso:
+  # Tous les jours à 6h17 (heure de Paris). Les données fournisseurs bougent peu : une fois par jour suffit.
+  cron: ${CONSO_CRON:0 17 6 * * *}
+  run-on-startup: ${CONSO_RUN_ON_STARTUP:true}
+  gdb:
+    enabled: ${CONSO_GDB_ENABLED:false}
+    email: ${CONSO_GDB_EMAIL:}
+    password: ${CONSO_GDB_PASSWORD:}
+  ileo:
+    enabled: ${CONSO_ILEO_ENABLED:false}
+    email: ${CONSO_ILEO_EMAIL:}
+    password: ${CONSO_ILEO_PASSWORD:}
+  netatmo:
+    enabled: ${CONSO_NETATMO_ENABLED:false}
+    client-id: ${CONSO_NETATMO_CLIENT_ID:}
+    client-secret: ${CONSO_NETATMO_CLIENT_SECRET:}
+    refresh-token: ${CONSO_NETATMO_REFRESH_TOKEN:}
+    token-file: ${CONSO_NETATMO_TOKEN_FILE:data/netatmo-token.json}
+    measure-type: ${CONSO_NETATMO_MEASURE_TYPE:sum_boiler_on}
+    lookback-days: ${CONSO_NETATMO_LOOKBACK_DAYS:1000}
+    device-id: ${CONSO_NETATMO_DEVICE_ID:}
+    module-id: ${CONSO_NETATMO_MODULE_ID:}
+  appwrite:
+    endpoint: ${CONSO_APPWRITE_ENDPOINT}
+    project-id: ${CONSO_APPWRITE_PROJECT_ID}
+    api-key: ${CONSO_APPWRITE_API_KEY}
+    database-id: ${CONSO_APPWRITE_DATABASE_ID:conso}
+    bucket-id: ${CONSO_APPWRITE_BUCKET_ID:invoices}
+    read-role: ${CONSO_APPWRITE_READ_ROLE:users}
+
+logging:
+  level:
+    fr.byj6n.conso: INFO
