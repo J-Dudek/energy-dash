@@ -53,7 +53,22 @@ case "$(get CONSO_DASHBOARD_BIND)" in
   *) echo "! CONSO_DASHBOARD_BIND expose le dashboard hors de la machine, en HTTP : à réserver à un essai" ;;
 esac
 
-# 6. Le .env ne doit pas être suivi par git
+# 6. Notifications : les trois réglages vont ensemble (tout ou rien)
+vpub="$(get CONSO_VAPID_PUBLIC_KEY)"
+vpriv="$(get CONSO_VAPID_PRIVATE_KEY)"
+vsub="$(get CONSO_PUSH_SUBJECT)"
+if [ -z "$vpub" ] && [ -z "$vpriv" ]; then
+  echo "· notifications désactivées (pas de clés VAPID)"
+elif [ -n "$vpub" ] && [ -n "$vpriv" ]; then
+  case "$vsub" in
+    mailto:?*@*|https://?*) ok "notifications : clés VAPID et contact renseignés" ;;
+    *) bad "CONSO_PUSH_SUBJECT doit être mailto:adresse ou https://site (Apple le vérifie)" ;;
+  esac
+else
+  bad "CONSO_VAPID_PUBLIC_KEY et CONSO_VAPID_PRIVATE_KEY vont ensemble (une seule est renseignée)"
+fi
+
+# 7. Le .env ne doit pas être suivi par git
 if command -v git >/dev/null 2>&1 && git rev-parse --git-dir >/dev/null 2>&1; then
   if git ls-files --error-unmatch "$ENV_FILE" >/dev/null 2>&1; then
     bad "$ENV_FILE est suivi par git (git rm --cached $ENV_FILE)"

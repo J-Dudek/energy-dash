@@ -35,6 +35,7 @@ const config = {
   bucketId: env.CONSO_APPWRITE_BUCKET_ID || 'invoices',
   idleMinutes: Number(env.CONSO_SESSION_IDLE_MINUTES || 30),
   maxSessionHours: Number(env.CONSO_SESSION_MAX_HOURS || 12),
+  vapidPublicKey: env.CONSO_VAPID_PUBLIC_KEY || '',
 };
 writeFileSync(outPath, JSON.stringify(config, null, 2) + '\n');
 console.log('[gen-config] public/config.json généré depuis .env');

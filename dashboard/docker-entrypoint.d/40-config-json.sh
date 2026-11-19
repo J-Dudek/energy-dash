@@ -25,6 +25,12 @@ for v in "$DB" "$BUCKET"; do
   printf '%s' "$v" | grep -Eq '^[A-Za-z0-9._-]{1,64}$' || { echo "identifiant Appwrite invalide" >&2; exit 1; }
 done
 
+# Clé publique VAPID (notifications) : facultative ; 65 octets (point P-256 non compressé) en base64url = 87 car.
+VAPID="${VAPID_PUBLIC_KEY:-}"
+if [ -n "$VAPID" ] && ! printf '%s' "$VAPID" | grep -Eq '^[A-Za-z0-9_-]{87}$'; then
+  echo "VAPID_PUBLIC_KEY invalide (87 caractères base64url attendus)" >&2; exit 1
+fi
+
 # Durées de session côté navigateur (garde-fous : la durée réelle se règle dans la console Appwrite)
 IDLE="${SESSION_IDLE_MINUTES:-30}"
 MAXH="${SESSION_MAX_HOURS:-12}"
@@ -41,7 +47,8 @@ cat > /tmp/conso/config.json <<JSON
   "databaseId": "${DB}",
   "bucketId": "${BUCKET}",
   "idleMinutes": ${IDLE},
-  "maxSessionHours": ${MAXH}
+  "maxSessionHours": ${MAXH},
+  "vapidPublicKey": "${VAPID}"
 }
 JSON
 

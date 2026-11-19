@@ -66,6 +66,12 @@ Le dashboard envoie lui-même HSTS, CSP et les autres en-têtes : inutile de les
 Vérifie : `https://conso.byj6n.fr` s'ouvre, `http://<ip-du-nas>:8095` ne répond pas depuis un autre appareil du
 réseau local.
 
+## 4 bis. Notifications (facultatif)
+
+Les notifications Web Push exigent HTTPS (déjà le cas derrière le reverse proxy). Génère les clés VAPID, ajoute-les
+au `.env` et relance : voir [notifications.md](notifications.md). Le collecteur contacte alors les services de push
+de Google / Apple / Mozilla en sortie (port 443) : si tu filtres le trafic sortant du NAS, autorise-les.
+
 ## 5. Durcir DSM lui-même
 
 - *Sécurité → Protection du compte* : double authentification sur les comptes administrateur, blocage automatique
