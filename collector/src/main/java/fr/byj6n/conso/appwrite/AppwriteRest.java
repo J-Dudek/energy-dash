@@ -48,6 +48,10 @@ public class AppwriteRest {
         return send(json(base(path), "PUT", body));
     }
 
+    public Result delete(String path) throws IOException, InterruptedException {
+        return send(base(path).DELETE());
+    }
+
     /** Envoie un fichier dans un bucket (≤ 5 Mo : pas besoin d'upload par morceaux). */
     public Result uploadFile(String bucketId, String fileId, String filename, byte[] content)
             throws IOException, InterruptedException {

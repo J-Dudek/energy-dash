@@ -50,4 +50,38 @@ class CollectorPropertiesTest {
         assertThat(new CollectorProperties.Account(false, null, "").toString())
                 .contains("password=(vide)");
     }
+
+    @Test
+    void clePriveeVapidMasquee() {
+        var p =
+                new CollectorProperties.Push(
+                        "mailto:moi@example.org", "publique", "privee-secrete");
+
+        assertThat(p.toString()).doesNotContain("privee-secrete").contains("enabled=true");
+    }
+
+    @Test
+    void notificationsDesactiveesSansLesDeuxCles() {
+        assertThat(new CollectorProperties.Push("mailto:a@b.fr", "pub", "").enabled()).isFalse();
+        assertThat(new CollectorProperties.Push("mailto:a@b.fr", null, "priv").enabled()).isFalse();
+        assertThat(new CollectorProperties.Push("mailto:a@b.fr", "pub", "priv").enabled()).isTrue();
+    }
+
+    @Test
+    void sectionPushAbsenteDeLaConfigurationDonneUneValeurParDefaut() {
+        // Les anciennes installations n'ont aucune variable CONSO_VAPID_* : le collecteur doit
+        // démarrer
+        var binder =
+                new org.springframework.boot.context.properties.bind.Binder(
+                        new org.springframework.boot.context.properties.source
+                                .MapConfigurationPropertySource(
+                                java.util.Map.of(
+                                        "conso.appwrite.endpoint", "https://a.example/v1",
+                                        "conso.appwrite.project-id", "p")));
+
+        var props = binder.bind("conso", CollectorProperties.class).get();
+
+        assertThat(props.push()).isNotNull();
+        assertThat(props.push().enabled()).isFalse();
+    }
 }

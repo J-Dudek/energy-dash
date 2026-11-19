@@ -7,6 +7,9 @@ import fr.byj6n.conso.gdb.GazDeBordeauxClient;
 import fr.byj6n.conso.ileo.IleoClient;
 import fr.byj6n.conso.netatmo.NetatmoClient;
 import fr.byj6n.conso.port.ProviderClient;
+import fr.byj6n.conso.push.PushNotifier;
+import fr.byj6n.conso.push.Vapid;
+import fr.byj6n.conso.push.WebPushClient;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
@@ -29,6 +32,15 @@ public class CollectorConfig {
     @Bean
     AppwriteStore appwriteStore(AppwriteRest api, CollectorProperties props) {
         return new AppwriteStore(api, props.appwrite());
+    }
+
+    @Bean
+    PushNotifier pushNotifier(AppwriteStore store, CollectorProperties props, ObjectMapper mapper) {
+        var push = props.push();
+        if (!push.enabled()) return new PushNotifier(store, null, mapper);
+        Vapid vapid =
+                Vapid.of(push.vapidPublicKey(), push.vapidPrivateKey(), push.subject(), mapper);
+        return new PushNotifier(store, new WebPushClient(vapid), mapper);
     }
 
     @Bean

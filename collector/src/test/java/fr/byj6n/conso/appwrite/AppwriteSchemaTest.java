@@ -78,6 +78,22 @@ class AppwriteSchemaTest {
                     .contains("read(\\\"user:abc123\\\")")
                     .contains("\"rowSecurity\":false");
         }
+        Call push =
+                calls.stream()
+                        .filter(
+                                c ->
+                                        c.method().equals("PUT")
+                                                && c.path()
+                                                        .equals(
+                                                                "/v1/tablesdb/conso/tables/push_subscriptions"))
+                        .findFirst()
+                        .orElseThrow();
+        // les appareils créent leurs abonnements ; chaque ligne n'est lisible que par son
+        // propriétaire
+        assertThat(push.body())
+                .contains("create(\\\"user:abc123\\\")")
+                .contains("\"rowSecurity\":true")
+                .doesNotContain("read(");
         Call bucket =
                 calls.stream()
                         .filter(
