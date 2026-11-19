@@ -8,7 +8,7 @@ la réduction (plus la taille est petite, plus on épaissit). Résultat dans das
 """
 from pathlib import Path
 
-from PIL import Image, ImageFilter, ImageOps
+from PIL import Image, ImageChops, ImageFilter, ImageOps
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "branding" / "logo.jpeg"
@@ -53,6 +53,29 @@ def silhouette(logo: Image.Image, size: int, height_ratio: float, bold: int) -> 
     return out
 
 
+def transparent(logo: Image.Image, height: int) -> Image.Image:
+    """Logo sur fond transparent (écran de connexion, clair ou sombre) : le noir devient transparence.
+
+    L'opacité vient de la clarté du pixel et la couleur est « dépremultipliée » : pas de liseré sombre autour des
+    traits quand le fond n'est pas noir.
+    """
+    scale = height / logo.height
+    small = logo.resize((round(logo.width * scale), height), Image.LANCZOS)
+    r, g, b = small.split()
+    # Opacité renforcée (x1,7) : les bleus sombres du logo restent pleins au lieu de devenir pastel sur fond clair.
+    alpha = ImageChops.lighter(ImageChops.lighter(r, g), b).point(lambda v: min(255, round(v * 1.7)))
+
+    def unpremultiply(channel: Image.Image) -> Image.Image:
+        values = zip(channel.get_flattened_data(), alpha.get_flattened_data())
+        return Image.frombytes(
+            "L", channel.size, bytes(min(255, c * 255 // a) if a else 0 for c, a in values)
+        )
+
+    out = Image.merge("RGB", tuple(unpremultiply(c) for c in (r, g, b)))
+    out.putalpha(alpha)
+    return out
+
+
 def main() -> None:
     ICONS.mkdir(parents=True, exist_ok=True)
     logo = load_logo()
@@ -69,6 +92,7 @@ def main() -> None:
     sizes = [16, 32, 48]
     icons = [square(logo, s, 0.94, 27 if s <= 16 else 25) for s in sizes]
     icons[-1].save(OUT / "favicon.ico", sizes=[(s, s) for s in sizes], append_images=icons[:-1])
+    transparent(logo, 384).save(ICONS / "logo.png", optimize=True)
     print("Icônes générées dans", OUT)
 
 
