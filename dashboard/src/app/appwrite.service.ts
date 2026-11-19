@@ -2,7 +2,7 @@ import { Injectable, computed, signal } from '@angular/core';
 import type { Models } from 'appwrite';
 import { Account, AppwriteException, Client, ID, Query, TablesDB } from 'appwrite';
 import { validateConfig } from './config';
-import { createCredential, getCredential } from './passkey';
+import { createCredential, getCredential, passkeysSupported } from './passkey';
 import type { AppConfig, InvoiceRow, ReadingRow, TariffRow } from './models';
 
 /**
@@ -21,6 +21,11 @@ export class AppwriteService {
   private tables!: TablesDB;
 
   readonly user = signal<Models.User | null>(null);
+  /**
+   * Proposition de créer une passkey : levée après chaque connexion par mot de passe (même si l'utilisateur en a
+   * déjà une : celle-ci peut être pour un autre appareil), jamais après une connexion par passkey.
+   */
+  readonly passkeyOffer = signal(false);
   /** Initiale affichée dans l'avatar (nom, à défaut e-mail). */
   readonly initial = computed(() => {
     const u = this.user();
@@ -60,6 +65,7 @@ export class AppwriteService {
     await this.account.createEmailPasswordSession({ email, password });
     this.user.set(await this.account.get());
     await this.preferCookieSession();
+    this.passkeyOffer.set(passkeysSupported());
   }
 
   /** Connexion par passkey : pas d'e-mail ni de mot de passe, l'appareil propose ses passkeys pour ce site. */
@@ -101,6 +107,7 @@ export class AppwriteService {
       await this.account.deleteSession({ sessionId: 'current' });
     } finally {
       this.dropLocalCopy();
+      this.passkeyOffer.set(false);
       this.user.set(null);
     }
   }

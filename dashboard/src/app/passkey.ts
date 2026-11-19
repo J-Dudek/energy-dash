@@ -43,3 +43,8 @@ function toJson(credential: Credential | null): object {
   }
   return credential.toJSON();
 }
+
+/** Nom proposé à une nouvelle passkey : l'appareil et la date, pour s'y retrouver dans la liste. */
+export function defaultPasskeyName(): string {
+  return `${navigator.platform || 'Appareil'} · ${new Date().toLocaleDateString('fr-FR')}`;
+}

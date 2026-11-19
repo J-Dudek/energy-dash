@@ -6,7 +6,7 @@ import { RouterLink } from '@angular/router';
 import type { Models } from 'appwrite';
 import { AppwriteException } from 'appwrite';
 import { AppwriteService } from './appwrite.service';
-import { isPasskeyCancelled, passkeysSupported } from './passkey';
+import { defaultPasskeyName, isPasskeyCancelled, passkeysSupported } from './passkey';
 
 /** Page de profil : changement d'adresse e-mail, passkeys, déconnexion. */
 @Component({
@@ -47,8 +47,7 @@ export class ProfilePage implements OnInit {
   }
 
   protected async addPasskey(): Promise<void> {
-    const name = `${navigator.platform || 'Appareil'} · ${new Date().toLocaleDateString('fr-FR')}`;
-    await this.passkeyAction(() => this.aw.addPasskey(name), 'Passkey ajoutée.');
+    await this.passkeyAction(() => this.aw.addPasskey(defaultPasskeyName()), 'Passkey ajoutée.');
   }
 
   protected async removePasskey(p: Models.Passkey): Promise<void> {

@@ -5,6 +5,8 @@ import { RouterLink } from '@angular/router';
 import { AppwriteService } from './appwrite.service';
 import { EnergyChart } from './energy-chart';
 import { DashboardStore } from './dashboard-store';
+import { errorMessage } from './errors';
+import { defaultPasskeyName, isPasskeyCancelled } from './passkey';
 import type { Energy, InvoiceRow } from './models';
 import { ENERGY_LABEL, PROVIDER_LABEL } from './models';
 import { invoiceFilename, kpi, series } from './stats';
@@ -24,6 +26,8 @@ export class Dashboard implements OnInit {
   protected readonly PROVIDER_LABEL = PROVIDER_LABEL;
 
   protected readonly downloading = signal<string | null>(null);
+  protected readonly offerBusy = signal(false);
+  protected readonly offerMessage = signal<string | null>(null);
 
   protected readonly loading = this.store.loading;
   protected readonly error = this.store.error;
@@ -72,6 +76,24 @@ export class Dashboard implements OnInit {
 
   protected async load(): Promise<void> {
     await this.store.load(true);
+  }
+
+  protected async createPasskey(): Promise<void> {
+    this.offerBusy.set(true);
+    this.offerMessage.set(null);
+    try {
+      await this.aw.addPasskey(defaultPasskeyName());
+      this.aw.passkeyOffer.set(false);
+    } catch (e) {
+      this.offerMessage.set(isPasskeyCancelled(e) ? 'Création annulée.' : errorMessage(e));
+    } finally {
+      this.offerBusy.set(false);
+    }
+  }
+
+  protected dismissOffer(): void {
+    this.aw.passkeyOffer.set(false);
+    this.offerMessage.set(null);
   }
 
   protected async download(inv: InvoiceRow): Promise<void> {

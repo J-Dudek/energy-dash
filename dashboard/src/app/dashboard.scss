@@ -239,3 +239,21 @@ tfoot .total td {
     display: none;
   } /* colonnes secondaires, repérées une à une (et non par rang) */
 }
+
+.offer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  border-color: var(--accent);
+
+  p {
+    margin: 4px 0 0;
+  }
+}
+
+.offer-actions {
+  display: flex;
+  gap: 8px;
+}

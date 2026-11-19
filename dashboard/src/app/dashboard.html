@@ -16,6 +16,28 @@
 </header>
 
 <main class="content">
+  @if (aw.passkeyOffer()) {
+    <section class="card offer" role="region" aria-label="Proposition de passkey">
+      <div>
+        <strong>Te connecter sans mot de passe ?</strong>
+        <p class="muted small">
+          Crée une passkey sur cet appareil : la prochaine fois, un geste (empreinte, visage ou
+          code) suffira.
+        </p>
+        @if (offerMessage(); as msg) {
+          <p class="small" role="status">{{ msg }}</p>
+        }
+      </div>
+      <div class="offer-actions">
+        <button class="primary sm" (click)="createPasskey()" [disabled]="offerBusy()">
+          {{ offerBusy() ? '…' : 'Créer une passkey' }}
+        </button>
+        <button class="ghost sm" (click)="dismissOffer()" [disabled]="offerBusy()">
+          Plus tard
+        </button>
+      </div>
+    </section>
+  }
   @if (error()) {
     <p class="error banner" role="alert">{{ error() }}</p>
   }
