@@ -1,9 +1,19 @@
 import { Injectable, computed, signal } from '@angular/core';
 import type { Models } from 'appwrite';
-import { Account, AppwriteException, Client, ID, Query, TablesDB } from 'appwrite';
+import {
+  Account,
+  AppwriteException,
+  Client,
+  ID,
+  Permission,
+  Query,
+  Role,
+  TablesDB,
+} from 'appwrite';
 import { validateConfig } from './config';
 import { createCredential, getCredential, passkeysSupported } from './passkey';
-import type { AppConfig, InvoiceRow, ReadingRow, TariffRow } from './models';
+import { currentSubscription, deviceLabel, subscriptionId } from './push';
+import type { AppConfig, InvoiceRow, PushDevice, ReadingRow, TariffRow } from './models';
 
 /**
  * Accès Appwrite côté navigateur. La config (endpoint, projet...) est lue au démarrage
@@ -37,6 +47,11 @@ export class AppwriteService {
 
   get idleMs(): number {
     return this.config.idleMinutes * 60_000;
+  }
+
+  /** Clé publique VAPID du serveur ; absente = notifications non configurées. */
+  get vapidPublicKey(): string | undefined {
+    return this.config.vapidPublicKey;
   }
 
   async init(): Promise<void> {
@@ -83,6 +98,75 @@ export class AppwriteService {
   /** Change l'adresse e-mail ; Appwrite exige le mot de passe actuel et remet la vérification de l'adresse à zéro. */
   async updateEmail(email: string, password: string): Promise<void> {
     this.user.set(await this.account.updateEmail({ email, password }));
+  }
+
+  /**
+   * Enregistre (ou rafraîchit) l'abonnement de cet appareil : le collecteur y lit où envoyer les notifications.
+   * La ligne n'est lisible que par son propriétaire.
+   */
+  async savePushSubscription(subscription: PushSubscription): Promise<void> {
+    const json = subscription.toJSON();
+    const p256dh = json.keys?.['p256dh'];
+    const auth = json.keys?.['auth'];
+    const user = this.user();
+    if (!user || !json.endpoint || !p256dh || !auth) throw new Error('Abonnement incomplet');
+    const me = Role.user(user.$id);
+    await this.tables.upsertRow({
+      databaseId: this.config.databaseId,
+      tableId: 'push_subscriptions',
+      rowId: await subscriptionId(json.endpoint),
+      data: { endpoint: json.endpoint, p256dh, auth, label: deviceLabel() },
+      permissions: [Permission.read(me), Permission.update(me), Permission.delete(me)],
+    });
+  }
+
+  async deletePushSubscription(endpoint: string): Promise<void> {
+    try {
+      await this.tables.deleteRow({
+        databaseId: this.config.databaseId,
+        tableId: 'push_subscriptions',
+        rowId: await subscriptionId(endpoint),
+      });
+    } catch (e) {
+      if (!(e instanceof AppwriteException && e.code === 404)) throw e;
+    }
+  }
+
+  /** Les appareils de l'utilisateur abonnés aux notifications (les lignes des autres lui sont invisibles). */
+  async pushDevices(): Promise<PushDevice[]> {
+    const res = await this.tables.listRows({
+      databaseId: this.config.databaseId,
+      tableId: 'push_subscriptions',
+      queries: [Query.orderDesc('$updatedAt'), Query.limit(50)],
+    });
+    return res.rows.map((r) => {
+      const row = r as unknown as { $id: string; $updatedAt: string; label?: string | null };
+      return { id: row.$id, label: row.label ?? 'Appareil', lastSeen: row.$updatedAt };
+    });
+  }
+
+  async deletePushDevice(id: string): Promise<void> {
+    await this.tables.deleteRow({
+      databaseId: this.config.databaseId,
+      tableId: 'push_subscriptions',
+      rowId: id,
+    });
+  }
+
+  /** Après connexion : si cet appareil est déjà abonné, on remet sa ligne à jour (clés renouvelées, ligne purgée). */
+  async syncPushSubscription(): Promise<void> {
+    if (
+      !this.vapidPublicKey ||
+      !('Notification' in window) ||
+      Notification.permission !== 'granted'
+    )
+      return;
+    try {
+      const subscription = await currentSubscription();
+      if (subscription) await this.savePushSubscription(subscription);
+    } catch {
+      // pas bloquant : l'utilisateur peut réactiver depuis la page Profil
+    }
   }
 
   async passkeys(): Promise<Models.Passkey[]> {

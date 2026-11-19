@@ -7,6 +7,16 @@ import type { Models } from 'appwrite';
 import { AppwriteException } from 'appwrite';
 import { AppwriteService } from './appwrite.service';
 import { defaultPasskeyName, isPasskeyCancelled, passkeysSupported } from './passkey';
+import type { PushDevice } from './models';
+import type { PushStatus } from './push';
+import {
+  PushDeniedError,
+  currentSubscription,
+  pushStatus,
+  readPushEnv,
+  subscribe,
+  subscriptionId,
+} from './push';
 
 /** Page de profil : changement d'adresse e-mail, passkeys, déconnexion. */
 @Component({
@@ -24,12 +34,90 @@ export class ProfilePage implements OnInit {
   protected readonly emailMessage = signal<string | null>(null);
   protected readonly passkeyMessage = signal<string | null>(null);
 
+  protected readonly pushState = signal<PushStatus>('unconfigured');
+  protected readonly pushMessage = signal<string | null>(null);
+  protected readonly devices = signal<PushDevice[]>([]);
+  /** Identifiant de l'abonnement de CET appareil, pour le repérer dans la liste. */
+  protected readonly thisDeviceId = signal<string | null>(null);
+
   protected newEmail = '';
   protected password = '';
 
   ngOnInit(): void {
     this.newEmail = this.aw.user()?.email ?? '';
     if (this.passkeySupported) void this.refreshPasskeys();
+    void this.refreshPush();
+  }
+
+  protected async enablePush(): Promise<void> {
+    const key = this.aw.vapidPublicKey;
+    if (!key) return;
+    this.busy.set(true);
+    this.pushMessage.set(null);
+    try {
+      const subscription = await subscribe(key);
+      await this.aw.savePushSubscription(subscription);
+      this.pushMessage.set('Notifications activées sur cet appareil.');
+    } catch (e) {
+      this.pushMessage.set(
+        e instanceof PushDeniedError ? 'Autorisation refusée.' : this.message(e),
+      );
+    } finally {
+      await this.refreshPush();
+      this.busy.set(false);
+    }
+  }
+
+  protected async disablePush(): Promise<void> {
+    this.busy.set(true);
+    this.pushMessage.set(null);
+    try {
+      const subscription = await currentSubscription();
+      if (subscription) {
+        await this.aw.deletePushSubscription(subscription.endpoint);
+        await subscription.unsubscribe();
+      }
+      this.pushMessage.set('Notifications désactivées sur cet appareil.');
+    } catch (e) {
+      this.pushMessage.set(this.message(e));
+    } finally {
+      await this.refreshPush();
+      this.busy.set(false);
+    }
+  }
+
+  protected async removeDevice(device: PushDevice): Promise<void> {
+    this.busy.set(true);
+    this.pushMessage.set(null);
+    try {
+      await this.aw.deletePushDevice(device.id);
+      if (device.id === this.thisDeviceId()) await (await currentSubscription())?.unsubscribe();
+      this.pushMessage.set('Appareil retiré.');
+    } catch (e) {
+      this.pushMessage.set(this.message(e));
+    } finally {
+      await this.refreshPush();
+      this.busy.set(false);
+    }
+  }
+
+  private async refreshPush(): Promise<void> {
+    let subscribed = false;
+    try {
+      const subscription = await currentSubscription();
+      subscribed = subscription !== null;
+      this.thisDeviceId.set(subscription ? await subscriptionId(subscription.endpoint) : null);
+    } catch {
+      // navigateur sans Web Push : le statut le dira
+    }
+    if (this.aw.vapidPublicKey) {
+      try {
+        this.devices.set(await this.aw.pushDevices());
+      } catch {
+        this.devices.set([]); // table pas encore créée (collecteur jamais lancé avec les notifications)
+      }
+    }
+    this.pushState.set(pushStatus(readPushEnv(this.aw.vapidPublicKey !== undefined, subscribed)));
   }
 
   protected async changeEmail(): Promise<void> {

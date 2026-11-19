@@ -1,3 +1,9 @@
+@if (update.available()) {
+  <div class="update-bar" role="status">
+    <span>Une nouvelle version est disponible.</span>
+    <button type="button" class="primary sm" (click)="update.reload()">Recharger</button>
+  </div>
+}
 @if (!ready()) {
   <main class="center"><p class="muted">Chargement…</p></main>
 } @else if (!aw.user()) {

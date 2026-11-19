@@ -16,7 +16,33 @@
 </header>
 
 <main class="content">
-  @if (aw.passkeyOffer()) {
+  @if (install.visible()) {
+    <section class="card offer" role="region" aria-label="Installer l'application">
+      <div>
+        <strong>Installer Conso maison sur cet appareil ?</strong>
+        @if (install.mode() === 'ios') {
+          <p class="muted small">
+            Touche <strong>Partager</strong> dans la barre de Safari, puis
+            <strong>Sur l'écran d'accueil</strong>. L'application s'ouvre alors en plein écran, et
+            c'est la condition pour recevoir les notifications sur iPhone.
+          </p>
+        } @else {
+          <p class="muted small">
+            Une icône sur l'écran d'accueil, l'application en plein écran, et les notifications de
+            nouvelles factures.
+          </p>
+        }
+      </div>
+      <div class="offer-actions">
+        @if (install.mode() === 'prompt') {
+          <button class="primary sm" (click)="install.install()">Installer</button>
+        }
+        <button class="ghost sm" (click)="install.dismiss()">
+          {{ install.mode() === 'ios' ? 'Compris' : 'Plus tard' }}
+        </button>
+      </div>
+    </section>
+  } @else if (aw.passkeyOffer()) {
     <section class="card offer" role="region" aria-label="Proposition de passkey">
       <div>
         <strong>Te connecter sans mot de passe ?</strong>
@@ -111,7 +137,7 @@
     }
   </section>
 
-  <section class="card">
+  <section class="card" id="graphique">
     <div class="section-head">
       <div>
         <h2>{{ ENERGY_LABEL[selected()] }}</h2>
@@ -227,7 +253,7 @@
     }
   </section>
 
-  <section class="card">
+  <section class="card" id="factures">
     <div class="section-head">
       <h2>Factures</h2>
       @if (invoiceProviders().length > 1) {
@@ -271,7 +297,7 @@
           </thead>
           <tbody>
             @for (inv of filteredInvoices(); track inv.$id) {
-              <tr>
+              <tr [class.flash]="highlight() === inv.$id" [id]="'facture-' + inv.$id">
                 <td>{{ inv.date | date: 'dd/MM/yyyy' }}</td>
                 <td class="hide-sm">{{ PROVIDER_LABEL[inv.provider] }}</td>
                 <td>

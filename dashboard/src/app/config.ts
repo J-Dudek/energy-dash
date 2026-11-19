@@ -1,6 +1,7 @@
 import type { AppConfig } from './models';
 
 const ID = /^[A-Za-z0-9._-]{1,64}$/;
+const VAPID_KEY = /^[A-Za-z0-9_-]{87}$/; // point P-256 non compressé (65 octets) en base64url
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
 export const DEFAULT_IDLE_MINUTES = 30;
@@ -35,6 +36,14 @@ export function validateConfig(raw: unknown): AppConfig {
       throw new Error(`Configuration invalide : ${key}`);
     }
   }
+  const vapid = c['vapidPublicKey'];
+  if (
+    vapid !== undefined &&
+    vapid !== '' &&
+    (typeof vapid !== 'string' || !VAPID_KEY.test(vapid))
+  ) {
+    throw new Error('Configuration invalide : vapidPublicKey');
+  }
   return {
     endpoint: endpoint.replace(/\/+$/, ''),
     projectId: c['projectId'] as string,
@@ -42,6 +51,7 @@ export function validateConfig(raw: unknown): AppConfig {
     bucketId: c['bucketId'] as string,
     idleMinutes: bounded(c['idleMinutes'], 1, 24 * 60, DEFAULT_IDLE_MINUTES),
     maxSessionHours: bounded(c['maxSessionHours'], 1, 24 * 30, DEFAULT_MAX_SESSION_HOURS),
+    ...(typeof vapid === 'string' && vapid !== '' ? { vapidPublicKey: vapid } : {}),
   };
 }
 

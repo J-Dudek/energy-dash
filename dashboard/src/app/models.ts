@@ -11,6 +11,16 @@ export interface AppConfig {
   idleMinutes: number;
   /** Durée de session maximale côté navigateur, quelle que soit l'activité. */
   maxSessionHours: number;
+  /** Clé publique VAPID (base64url) : absente = notifications non configurées côté serveur. */
+  vapidPublicKey?: string;
+}
+
+/** Appareil abonné aux notifications (ligne de `push_subscriptions`, lisible par son seul propriétaire). */
+export interface PushDevice {
+  id: string;
+  label: string;
+  /** Dernière mise à jour de l'abonnement : rafraîchi à chaque connexion depuis l'appareil. */
+  lastSeen: string;
 }
 
 /** Ligne de la table `readings` (écrite par le collecteur). */

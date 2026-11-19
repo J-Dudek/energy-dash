@@ -69,6 +69,67 @@
     </section>
   }
 
+  @if (pushState() !== 'unconfigured') {
+    <section class="card block">
+      <h2>Notifications</h2>
+      <p class="muted small">
+        Sois prévenu dès qu'une nouvelle facture est disponible (le collecteur passe chaque matin).
+      </p>
+      @switch (pushState()) {
+        @case ('ios-install') {
+          <p class="small">
+            Sur iPhone et iPad, les notifications ne marchent que depuis l'application installée :
+            dans Safari, touche <strong>Partager</strong>, puis
+            <strong>Sur l'écran d'accueil</strong>. Ouvre ensuite « Conso » depuis l'écran d'accueil
+            et reviens ici. (iOS 16.4 ou plus.)
+          </p>
+        }
+        @case ('unsupported') {
+          <p class="small">Ce navigateur ne gère pas les notifications.</p>
+        }
+        @case ('denied') {
+          <p class="small">
+            Les notifications sont bloquées pour ce site : autorise-les dans les réglages du
+            navigateur (ou de l'appareil), puis recharge la page.
+          </p>
+        }
+        @case ('enabled') {
+          <p class="small">Activées sur cet appareil.</p>
+          <button type="button" class="ghost sm" (click)="disablePush()" [disabled]="busy()">
+            Désactiver sur cet appareil
+          </button>
+        }
+        @default {
+          <button type="button" class="primary sm" (click)="enablePush()" [disabled]="busy()">
+            Activer sur cet appareil
+          </button>
+        }
+      }
+      @if (devices().length > 0) {
+        <h3>Appareils notifiés</h3>
+        <ul>
+          @for (d of devices(); track d.id) {
+            <li>
+              <span>
+                {{ d.label }}
+                @if (d.id === thisDeviceId()) {
+                  <strong class="small">· cet appareil</strong>
+                }
+                <span class="muted small"> · vu le {{ d.lastSeen | date: 'dd/MM/yyyy' }}</span>
+              </span>
+              <button type="button" class="link" (click)="removeDevice(d)" [disabled]="busy()">
+                Retirer
+              </button>
+            </li>
+          }
+        </ul>
+      }
+      @if (pushMessage(); as msg) {
+        <p class="small" role="status">{{ msg }}</p>
+      }
+    </section>
+  }
+
   <section class="card block">
     <div class="actions">
       <a routerLink="/" class="button ghost">Retour au tableau de bord</a>
