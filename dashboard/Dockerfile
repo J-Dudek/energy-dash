@@ -18,7 +18,7 @@ COPY --from=build /src/dist/dashboard/browser /usr/share/nginx/html
 COPY docker-entrypoint.d/40-config-json.sh /docker-entrypoint.d/40-config-json.sh
 # Le contexte de build vient d'un dossier à ACL (Synology) : les droits des fichiers copiés ne sont pas fiables.
 # On les fixe explicitement (en root, le temps de l'instruction) : config lisible, script exécutable.
-USER root
+USER 0
 RUN chmod 644 /etc/nginx/conf.d/default.conf \
  && chmod 755 /docker-entrypoint.d/40-config-json.sh
 EXPOSE 8080
