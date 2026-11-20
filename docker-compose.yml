@@ -21,9 +21,9 @@ services:
     read_only: true
     tmpfs:
       - /tmp
-    pids_limit: 200
+    # pids_limit: 200
     mem_limit: 384m
-    cpus: 1.0
+    # cpus: 1.0
     logging: &logs
       driver: json-file
       options: # sans plafond, les journaux grossissent indéfiniment sur le disque du NAS
@@ -54,9 +54,9 @@ services:
     read_only: true
     tmpfs:
       - /tmp
-    pids_limit: 100
+    # pids_limit: 100
     mem_limit: 64m
-    cpus: 0.5
+    # cpus: 0.5
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/config.json"]
       interval: 30s
